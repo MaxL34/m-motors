@@ -1,5 +1,5 @@
 from enum import Enum
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SqlEnum
+from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Enum as SqlEnum
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -78,8 +78,8 @@ mileage = Column(Integer, nullable=False, default=0)
 engine_power = Column(Integer, nullable=True)
 
 # Pricing
-selling_price = Column(float, nullable=False)
-monthly_rental_price = Column(float, nullable=True)
+selling_price = Column(Float, nullable=False)
+monthly_rental_price = Column(Float, nullable=True)
 
 # Description
 color = Column(String(30), nullable=True)
@@ -92,3 +92,6 @@ deactivated_at = Column(DateTime, nullable=False)
 created_at = Column(DateTime, server_default=func.now(), nullable=False)
 updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 is_for_sale = Column(Boolean, nullable=False, default=True)
+
+#Relations - will be completed when the other models are created
+client_files = relationship("ClientFile", back_populates="vehicle")
