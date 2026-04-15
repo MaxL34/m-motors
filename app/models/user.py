@@ -6,8 +6,8 @@ from app.database import Base
 class User(Base):
     """SQLAlchemy model for a user in the application M-Motors.
     
-    A user can be a cutomer : is_admin=Flase
-    Or an admin : is_admin=True
+    A user can be an admin : is_admin=True
+    Or a cutomer : is_admin=False
     """
     __tablename__="users"
 
