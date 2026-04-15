@@ -44,9 +44,9 @@ class ClientFile(Base):
     # File details
     agreed_price = Column(Float, nullable=True)
     notes = Column(Text, nullable=True)
-
-    # Enums
     file_type = Column(SqlEnum(ClientFileType), nullable=False)
+
+    # Status
     status = Column(SqlEnum(ClientFileStatus), default=ClientFileStatus.PENDING, nullable=False)
 
     # Timestamps
@@ -60,3 +60,4 @@ class ClientFile(Base):
     # Relationships
     user = relationship("User", back_populates="client_files")
     vehicle = relationship("Vehicle", back_populates="client_files")
+    documents = relationship("Document", back_populates="client_file")
