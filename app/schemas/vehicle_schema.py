@@ -29,9 +29,9 @@ class VehicleCreate(BaseModel):
     transmission_type: TransmissionType = Field(description="Transmission type of the vehicle")
     mileage: int = Field(ge=0, description="Current mileage in km")
     engine_power: int = Field(ge=0, description="Engine power in horsepower (HP)")
-    descrition: str = Field(min_length=350, max_length=1000, description="Detailed description of the vehicle")
+    description: Optional[str] = Field(default=None, max_length=1000, description="Detailed description of the vehicle")
 
     # Commercial details
     is_for_sale: bool = Field(description="Whether the vehicle is for sale (True) or for rent (False)")
-    selling_price: Optional[float] = Field(gt=0, description="Selling price must be greater than zero.")
+    selling_price: Optional[float] = Field(default=None, gt=0, description="Selling price must be greater than zero.")
     monthly_rental_price: Optional[float] = Field(gt=0, description="Monthly rental price must be greater than zero if provided.")

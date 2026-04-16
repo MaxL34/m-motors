@@ -52,7 +52,7 @@ class Vehicle(Base):
         selling_price: Selling price in euros
         monthly_rental_price: Monthly rental price in euros (optional)
         color: Vehicle color
-        description: Detailed description pf the vehicle
+        description: Detailed description of the vehicle
         status: ACTIVE or INACTIVE
         deactivation_reason: Why it was deactivated (SOLD, ACCIDENT, etc.)
         deactivated_at: When it was deactivated
