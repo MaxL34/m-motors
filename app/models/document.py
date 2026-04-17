@@ -52,4 +52,3 @@ class Document(Base):
 
     # Relationships
     client_file = relationship("ClientFile", back_populates="documents")
-    documents = relationship("Document", back_populates="client_file")

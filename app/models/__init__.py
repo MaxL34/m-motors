@@ -1,7 +1,8 @@
 """This module imports all the models used in the application M-Motors."""
 
+from app.database import Base
 from app.models.user import User
-from app.models import Vehicle
+from app.models.vehicle import Vehicle
 from app.models.client_file import ClientFile, ClientFileStatus, ClientFileType
 from app.models.document import Document, DocumentType
 

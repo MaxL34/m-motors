@@ -24,5 +24,5 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
-#Relations - will be completed when the other models are created
-client_files = relationship("ClientFile", back_populates="user")
+    #Relations - will be completed when the other models are created
+    client_files = relationship("ClientFile", back_populates="user")
