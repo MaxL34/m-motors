@@ -1,0 +1,64 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Catalogue — M-Motors{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <h1 class="text-3xl font-bold text-gray-900">Catalogue de véhicules</h1>
+    <p class="text-gray-500 mt-1">{{ vehicles | length }} véhicule(s) disponible(s)</p>
+</div>
+
+{% if vehicles %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for vehicle in vehicles %}
+    <div class="bg-white rounded-2xl shadow hover:shadow-md transition overflow-hidden">
+
+        <div class="bg-gray-200 h-48 flex items-center justify-center text-gray-400 text-sm">
+            Pas de photo
+        </div>
+
+        <div class="p-5">
+            <div class="flex items-center justify-between mb-1">
+                <h2 class="text-lg font-semibold text-gray-900">
+                    {{ vehicle.brand }} {{ vehicle.model }}
+                </h2>
+                <span class="text-xs font-medium px-2 py-1 rounded-full
+                    {% if vehicle.is_for_sale %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
+                    {% if vehicle.is_for_sale %}Vente{% else %}Location{% endif %}
+                </span>
+            </div>
+
+            <p class="text-sm text-gray-500 mb-4">
+                {{ vehicle.year }}
+                {% if vehicle.fuel_type %} · {{ vehicle.fuel_type.value }}{% endif %}
+                {% if vehicle.transmission_type %} · {{ vehicle.transmission_type.value }}{% endif %}
+                · {{ vehicle.mileage | int }} km
+            </p>
+
+            <div class="flex items-center justify-between">
+                <span class="text-xl font-bold text-gray-900">
+                    {% if vehicle.is_for_sale and vehicle.selling_price %}
+                        {{ "%.0f" | format(vehicle.selling_price) }} €
+                    {% elif not vehicle.is_for_sale and vehicle.monthly_rental_price %}
+                        {{ "%.0f" | format(vehicle.monthly_rental_price) }} € / mois
+                    {% else %}
+                        Prix sur demande
+                    {% endif %}
+                </span>
+                <a href="/vehicles/{{ vehicle.id }}"
+                   class="text-sm font-medium text-blue-600 hover:underline">
+                    Voir le détail →
+                </a>
+            </div>
+        </div>
+
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-24 text-gray-400">
+    <p class="text-xl font-medium">Aucun véhicule disponible pour le moment.</p>
+</div>
+{% endif %}
+{% endblock %}
