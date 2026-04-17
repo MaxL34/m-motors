@@ -94,8 +94,8 @@ class Vehicle(Base):
 
     # Status and audit
     status: Mapped[VehicleStatus] = mapped_column(SqlEnum(VehicleStatus), nullable=False, default=VehicleStatus.INACTIVE, index=True)
-    deactivation_reason: Mapped[str] = mapped_column(String(255), nullable=False)
-    deactivated_at: Mapped[datetime] = mapped_column(nullable=False)
+    deactivation_reason: Mapped[str] = mapped_column(String(255), nullable=True)
+    deactivated_at: Mapped[datetime] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())                                                                                                                                                                                           
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now()) 
 
