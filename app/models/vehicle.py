@@ -1,7 +1,11 @@
 from enum import Enum
-from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Enum as SqlEnum
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy import Integer, Float, String, Boolean, Enum as SqlEnum
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+
 from app.database import Base
 
 
@@ -59,39 +63,41 @@ class Vehicle(Base):
         created_at: Creation timestamp
         updated_at: Last modification update
     """
-    __tablename__="vehicles"
+    __tablename__ = "vehicles"
 
-# Identifiers
-id = Column(Integer, primary_key=True, index=True)
-vin = Column(String(17), unique=True, index=True, nullable=False)
-licence_plate = Column(String(20), unique=True, index=True, nullable=False)
+    # Identifiers
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    vin: Mapped[str] = mapped_column(String(17), unique=True, index=True)
+    licence_plate: Mapped[str] = mapped_column(String(20), unique=True, index=True)
 
-# General informations
-brand = Column(String(50), nullable=False)
-model = Column(String(50), nullable=False)
-year = Column(Integer, nullable=False)
-fuel_type = Column(SqlEnum(FuelType), nullable=True, default=FuelType.PETROL)
-transmission_type = Column(SqlEnum(TransmissionType), nullable=True, default=TransmissionType.MANUAL)
+    # General informations
+    brand: Mapped[str] = mapped_column(String(50))
+    model: Mapped[str] = mapped_column(String(50))
+    year: Mapped[int] = mapped_column(Integer)
+    fuel_type: Mapped[Optional[FuelType]] = mapped_column(SqlEnum(FuelType), nullable=True)
+    transmission_type: Mapped[Optional[TransmissionType]] = mapped_column(SqlEnum(TransmissionType), nullable=True)
 
-# Technical specifications
-mileage = Column(Integer, nullable=False, default=0)
-engine_power = Column(Integer, nullable=True)
+    # Technical specifications
+    mileage: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    engine_power: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-# Pricing
-selling_price = Column(Float, nullable=False)
-monthly_rental_price = Column(Float, nullable=True)
+    # Pricing
+    selling_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    monthly_rental_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
-# Description
-color = Column(String(30), nullable=True)
-description = Column(String(500), nullable=False)
+    # Description
+    color: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
-# Status and audit
-status = Column(SqlEnum(VehicleStatus), nullable=False, default=VehicleStatus.INACTIVE, index=True)
-deactivation_reason = Column(String(255), nullable=False)
-deactivated_at = Column(DateTime, nullable=False)
-created_at = Column(DateTime, server_default=func.now(), nullable=False)
-updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
-is_for_sale = Column(Boolean, nullable=False, default=True)
+    # Commercial
+    is_for_sale: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-#Relations - will be completed when the other models are created
-client_files = relationship("ClientFile", back_populates="vehicle")
+    # Status and audit
+    status: Mapped[VehicleStatus] = mapped_column(SqlEnum(VehicleStatus), nullable=False, default=VehicleStatus.INACTIVE, index=True)
+    deactivation_reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    deactivated_at: Mapped[datetime] = mapped_column(nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())                                                                                                                                                                                           
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now()) 
+
+    # Relations
+    client_files: Mapped[list] = relationship("ClientFile", back_populates="vehicle")
