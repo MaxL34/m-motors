@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.vehicle import Vehicle, VehicleStatus
+from app.models.vehicle import Vehicle, VehicleStatus, VehicleStatusHistory, StatusAction
 from app.schemas.vehicle_schema import VehicleCreate, VehicleUpdate, VehicleDeactivate
 
 
@@ -66,6 +66,7 @@ def activate_vehicle(db: Session, vehicle_id: int) -> Vehicle:
     vehicle.status = VehicleStatus.ACTIVE
     vehicle.deactivation_reason = None
     vehicle.deactivated_at = None
+    db.add(VehicleStatusHistory(vehicle_id=vehicle_id, action=StatusAction.ACTIVATED))
     db.commit()
     db.refresh(vehicle)
     return vehicle
@@ -78,6 +79,7 @@ def deactivate_vehicle(db: Session, vehicle_id: int, data: VehicleDeactivate) ->
     vehicle.status = VehicleStatus.INACTIVE
     vehicle.deactivation_reason = data.deactivation_reason
     vehicle.deactivated_at = datetime.now(timezone.utc)
+    db.add(VehicleStatusHistory(vehicle_id=vehicle_id, action=StatusAction.DEACTIVATED, reason=data.deactivation_reason))
     db.commit()
     db.refresh(vehicle)
     return vehicle
