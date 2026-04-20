@@ -2,11 +2,16 @@ from enum import Enum
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Integer, Float, String, Boolean, Enum as SqlEnum
+from sqlalchemy import Integer, Float, String, Boolean, Enum as SqlEnum, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
 from app.database import Base
+
+
+class StatusAction(str, Enum):
+    ACTIVATED = "ACTIVATED"
+    DEACTIVATED = "DEACTIVATED"
 
 
 class VehicleStatus(str, Enum):
@@ -101,3 +106,18 @@ class Vehicle(Base):
 
     # Relations
     client_files: Mapped[list] = relationship("ClientFile", back_populates="vehicle")
+    status_history: Mapped[list["VehicleStatusHistory"]] = relationship(
+        "VehicleStatusHistory", back_populates="vehicle", cascade="all, delete-orphan"
+    )
+
+
+class VehicleStatusHistory(Base):
+    __tablename__ = "vehicle_status_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"), nullable=False, index=True)
+    action: Mapped[StatusAction] = mapped_column(SqlEnum(StatusAction), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+    vehicle: Mapped["Vehicle"] = relationship("Vehicle", back_populates="status_history")
