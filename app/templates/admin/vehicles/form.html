@@ -51,54 +51,52 @@
     class="space-y-6"
 >
 
-    <!-- Identification (création uniquement) -->
-    {% if not is_edit %}
+
+    <!-- Informations générales -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 class="text-sm font-semibold text-gray-900 mb-4">Identification</h2>
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">VIN</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">VIN <span class="text-red-500">*</span></label>
                 <input type="text" name="vin" value="{{ val('vin') }}" maxlength="17" minlength="17"
-                       placeholder="17 caractères"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="17 caractères"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Immatriculation <span class="text-red-500">*</span></label>
                 <input type="text" name="licence_plate" value="{{ val('licence_plate') }}" maxlength="20"
-                       placeholder="ex : AB-123-CD"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="ex : AB-123-CD"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Informations générales -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 class="text-sm font-semibold text-gray-900 mb-4">Informations générales</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Marque <span class="text-red-500">*</span></label>
                 <input type="text" name="brand" value="{{ val('brand') }}" maxlength="50"
-                       placeholder="ex : Peugeot"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="ex : Peugeot"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Marque <span class="text-red-500">*</span></label>
+                <input type="text" name="brand" value="{{ val('brand') }}" maxlength="50"
+                placeholder="ex : Peugeot"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Modèle <span class="text-red-500">*</span></label>
                 <input type="text" name="model" value="{{ val('model') }}" maxlength="50"
-                       placeholder="ex : 308"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="ex : 308"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Année <span class="text-red-500">*</span></label>
                 <input type="number" name="year" value="{{ val('year') }}" min="2000" max="2100"
-                       placeholder="{{ now().year if now else 2024 }}"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="{{ now().year if now else 2024 }}"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Couleur</label>
                 <input type="text" name="color" value="{{ val('color') }}" maxlength="30"
-                       placeholder="ex : Blanc nacré"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="ex : Blanc nacré"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Carburant <span class="text-red-500">*</span></label>
@@ -134,13 +132,13 @@
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Kilométrage (km) <span class="text-red-500">*</span></label>
                 <input type="number" name="mileage" value="{{ val('mileage', 0) }}" min="0"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Puissance (ch)</label>
                 <input type="number" name="engine_power" value="{{ val('engine_power') }}" min="0"
-                       placeholder="ex : 130"
-                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                placeholder="ex : 130"
+                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
         </div>
     </div>
@@ -154,12 +152,12 @@
                 <div class="flex gap-3">
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="is_for_sale" value="true" x-model="isForSale"
-                               class="text-indigo-600">
+                        class="text-indigo-600">
                         <span class="text-sm font-medium text-gray-700">Vente</span>
                     </label>
                     <label class="flex items-center gap-2 cursor-pointer">
                         <input type="radio" name="is_for_sale" value="false" x-model="isForSale"
-                               class="text-indigo-600">
+                        class="text-indigo-600">
                         <span class="text-sm font-medium text-gray-700">Location</span>
                     </label>
                 </div>
@@ -168,17 +166,17 @@
             <div x-show="isForSale === 'true'" x-cloak>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Prix de vente (€)</label>
                 <input type="number" name="selling_price"
-                       value="{{ val('selling_price') }}" min="0" step="100"
-                       placeholder="ex : 15000"
-                       class="block w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                value="{{ val('selling_price') }}" min="0" step="100"
+                placeholder="ex : 15000"
+                class="block w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
 
             <div x-show="isForSale === 'false'" x-cloak>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Loyer mensuel (€/mois)</label>
                 <input type="number" name="monthly_rental_price"
-                       value="{{ val('monthly_rental_price') }}" min="0" step="10"
-                       placeholder="ex : 350"
-                       class="block w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                value="{{ val('monthly_rental_price') }}" min="0" step="10"
+                placeholder="ex : 350"
+                class="block w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
             </div>
         </div>
     </div>
@@ -187,8 +185,8 @@
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 class="text-sm font-semibold text-gray-900 mb-4">Description</h2>
         <textarea name="description" rows="4" maxlength="500"
-                  placeholder="Description du véhicule, équipements, état général…"
-                  class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none">{{ val('description') }}</textarea>
+        placeholder="Description du véhicule, équipements, état général…"
+        class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none">{{ val('description') }}</textarea>
         <p class="text-xs text-gray-400 mt-1">500 caractères maximum</p>
     </div>
 
@@ -199,7 +197,7 @@
             {% if is_edit %}Enregistrer les modifications{% else %}Créer le véhicule{% endif %}
         </button>
         <a href="{% if is_edit %}/admin/vehicles/{{ vehicle.id }}{% else %}/admin/vehicles{% endif %}"
-           class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2.5">
+        class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2.5">
             Annuler
         </a>
     </div>
