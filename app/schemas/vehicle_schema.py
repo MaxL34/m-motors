@@ -17,8 +17,9 @@ class VehicleCreate(BaseModel):
     fuel_type: FuelType = Field(description="Fuel type of the vehicle")
     transmission_type: TransmissionType = Field(description="Transmission type of the vehicle")
     mileage: int = Field(ge=0, description="Current mileage in km")
-    engine_power: int = Field(ge=0, description="Engine power in horsepower (HP)")
-    description: Optional[str] = Field(default=None, max_length=1000, description="Detailed description of the vehicle")
+    engine_power: Optional[int] = Field(default=None, ge=0, description="Engine power in horsepower (HP)")
+    color: Optional[str] = Field(default=None, max_length=30)
+    description: Optional[str] = Field(default=None, max_length=500, description="Detailed description of the vehicle")
 
     # Commercial information
     is_for_sale: bool = Field(description="Whether the vehicle is for sale (True) or for rent (False)")
