@@ -1,0 +1,211 @@
+{% extends "admin/base_admin.html" %}
+
+{% set is_edit = vehicle is not none %}
+
+{% block title %}{% if is_edit %}Modifier {{ vehicle.brand }} {{ vehicle.model }}{% else %}Nouveau véhicule{% endif %} — Admin M-Motors{% endblock %}
+
+{% block page_title %}{% if is_edit %}Modifier le véhicule{% else %}Nouveau véhicule{% endif %}{% endblock %}
+
+{% block header_actions %}
+<a href="{% if is_edit %}/admin/vehicles/{{ vehicle.id }}{% else %}/admin/vehicles{% endif %}"
+   class="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18"/>
+    </svg>
+    Annuler
+</a>
+{% endblock %}
+
+{% block content %}
+
+{# Helpers pour pré-remplissage : form_data en priorité (erreur), sinon vehicle (edit), sinon vide (create) #}
+{% macro val(field, default='') %}{{ form_data.get(field) if form_data.get(field) is not none and form_data.get(field) != '' else ((vehicle | attr(field)) if is_edit and (vehicle | attr(field)) is not none else default) }}{% endmacro %}
+
+{% set current_fuel = form_data.get('fuel_type') or (vehicle.fuel_type.value if is_edit and vehicle.fuel_type else '') %}
+{% set current_transmission = form_data.get('transmission_type') or (vehicle.transmission_type.value if is_edit and vehicle.transmission_type else '') %}
+{% set current_is_for_sale = form_data.get('is_for_sale') or ('true' if is_edit and vehicle.is_for_sale else ('false' if is_edit and not vehicle.is_for_sale else 'true')) %}
+
+<!-- Erreurs -->
+{% if errors %}
+<div class="mb-5 bg-red-50 border border-red-200 rounded-xl p-4">
+    <div class="flex items-start gap-3">
+        <svg class="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/>
+        </svg>
+        <div>
+            <p class="text-sm font-medium text-red-700">Veuillez corriger les erreurs suivantes :</p>
+            <ul class="mt-1 text-sm text-red-600 space-y-0.5">
+                {% for err in errors %}
+                <li>{% if err.loc %}<span class="font-medium">{{ err.loc }}</span> : {% endif %}{{ err.msg }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<form
+    method="post"
+    action="{% if is_edit %}/admin/vehicles/{{ vehicle.id }}/edit{% else %}/admin/vehicles{% endif %}"
+    x-data="{ isForSale: '{{ current_is_for_sale }}' }"
+    class="space-y-6"
+>
+
+    <!-- Identification (création uniquement) -->
+    {% if not is_edit %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">Identification</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">VIN <span class="text-red-500">*</span></label>
+                <input type="text" name="vin" value="{{ val('vin') }}" maxlength="17" minlength="17"
+                       placeholder="17 caractères"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Immatriculation <span class="text-red-500">*</span></label>
+                <input type="text" name="licence_plate" value="{{ val('licence_plate') }}" maxlength="20"
+                       placeholder="ex : AB-123-CD"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono uppercase focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Informations générales -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">Informations générales</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Marque <span class="text-red-500">*</span></label>
+                <input type="text" name="brand" value="{{ val('brand') }}" maxlength="50"
+                       placeholder="ex : Peugeot"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Modèle <span class="text-red-500">*</span></label>
+                <input type="text" name="model" value="{{ val('model') }}" maxlength="50"
+                       placeholder="ex : 308"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Année <span class="text-red-500">*</span></label>
+                <input type="number" name="year" value="{{ val('year') }}" min="2000" max="2100"
+                       placeholder="{{ now().year if now else 2024 }}"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Couleur</label>
+                <input type="text" name="color" value="{{ val('color') }}" maxlength="30"
+                       placeholder="ex : Blanc nacré"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Carburant <span class="text-red-500">*</span></label>
+                <select name="fuel_type"
+                        class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                    <option value="">— Choisir —</option>
+                    {% for ft in fuel_types %}
+                    <option value="{{ ft.value }}" {% if current_fuel == ft.value %}selected{% endif %}>
+                        {{ fuel_labels[ft] }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Transmission <span class="text-red-500">*</span></label>
+                <select name="transmission_type"
+                        class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+                    <option value="">— Choisir —</option>
+                    {% for tt in transmission_types %}
+                    <option value="{{ tt.value }}" {% if current_transmission == tt.value %}selected{% endif %}>
+                        {{ transmission_labels[tt] }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Caractéristiques techniques -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">Caractéristiques techniques</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Kilométrage (km) <span class="text-red-500">*</span></label>
+                <input type="number" name="mileage" value="{{ val('mileage', 0) }}" min="0"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Puissance (ch)</label>
+                <input type="number" name="engine_power" value="{{ val('engine_power') }}" min="0"
+                       placeholder="ex : 130"
+                       class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+        </div>
+    </div>
+
+    <!-- Offre commerciale -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">Offre commerciale</h2>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-2">Type d'offre <span class="text-red-500">*</span></label>
+                <div class="flex gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="is_for_sale" value="true" x-model="isForSale"
+                               class="text-indigo-600">
+                        <span class="text-sm font-medium text-gray-700">Vente</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="is_for_sale" value="false" x-model="isForSale"
+                               class="text-indigo-600">
+                        <span class="text-sm font-medium text-gray-700">Location</span>
+                    </label>
+                </div>
+            </div>
+
+            <div x-show="isForSale === 'true'" x-cloak>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Prix de vente (€)</label>
+                <input type="number" name="selling_price"
+                       value="{{ val('selling_price') }}" min="0" step="100"
+                       placeholder="ex : 15000"
+                       class="block w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+
+            <div x-show="isForSale === 'false'" x-cloak>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Loyer mensuel (€/mois)</label>
+                <input type="number" name="monthly_rental_price"
+                       value="{{ val('monthly_rental_price') }}" min="0" step="10"
+                       placeholder="ex : 350"
+                       class="block w-full sm:w-64 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none">
+            </div>
+        </div>
+    </div>
+
+    <!-- Description -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-900 mb-4">Description</h2>
+        <textarea name="description" rows="4" maxlength="500"
+                  placeholder="Description du véhicule, équipements, état général…"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-none">{{ val('description') }}</textarea>
+        <p class="text-xs text-gray-400 mt-1">500 caractères maximum</p>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+        <button type="submit"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors">
+            {% if is_edit %}Enregistrer les modifications{% else %}Créer le véhicule{% endif %}
+        </button>
+        <a href="{% if is_edit %}/admin/vehicles/{{ vehicle.id }}{% else %}/admin/vehicles{% endif %}"
+           class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2.5">
+            Annuler
+        </a>
+    </div>
+
+</form>
+
+<style>[x-cloak] { display: none !important; }</style>
+
+{% endblock %}

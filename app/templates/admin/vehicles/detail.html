@@ -1,0 +1,242 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}{{ vehicle.brand }} {{ vehicle.model }} — Admin M-Motors{% endblock %}
+
+{% block page_title %}Détail du véhicule{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    <a href="/admin/vehicles/{{ vehicle.id }}/edit"
+       class="inline-flex items-center gap-1.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125"/>
+        </svg>
+        Modifier
+    </a>
+    <a href="/admin/vehicles"
+       class="text-sm text-gray-400 hover:text-gray-600 px-2 py-2">
+        ← Liste
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+
+<!-- Alertes -->
+{% if success %}
+<div class="mb-5 bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
+    <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
+    </svg>
+    <p class="text-sm text-green-700">{{ success }}</p>
+</div>
+{% endif %}
+
+{% if error %}
+<div class="mb-5 bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center gap-3">
+    <svg class="w-5 h-5 text-red-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/>
+    </svg>
+    <p class="text-sm text-red-700">{{ error }}</p>
+</div>
+{% endif %}
+
+<!-- En-tête véhicule -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6"
+     x-data="{ showDeactivateModal: false }">
+
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <div class="flex items-center gap-3 mb-1">
+                <h2 class="text-xl font-bold text-gray-900">{{ vehicle.brand }} {{ vehicle.model }}</h2>
+                {% if vehicle.status.value == 'ACTIVE' %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>Actif
+                </span>
+                {% else %}
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">
+                    <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>Inactif
+                </span>
+                {% endif %}
+                {% if vehicle.is_for_sale %}
+                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">Vente</span>
+                {% else %}
+                <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700">Location</span>
+                {% endif %}
+            </div>
+            <p class="text-sm text-gray-500 font-mono">{{ vehicle.licence_plate }} · VIN {{ vehicle.vin }}</p>
+        </div>
+
+        <!-- Bouton activer / désactiver -->
+        <div class="shrink-0">
+            {% if vehicle.status.value == 'INACTIVE' %}
+            <form method="post" action="/admin/vehicles/{{ vehicle.id }}/activate">
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v9"/>
+                    </svg>
+                    Activer
+                </button>
+            </form>
+            {% else %}
+            <button
+                @click="showDeactivateModal = true"
+                class="inline-flex items-center gap-1.5 border border-red-300 hover:bg-red-50 text-red-600 text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.636 5.636a9 9 0 1 0 12.728 0M12 3v9"/>
+                </svg>
+                Désactiver
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Modal désactivation -->
+    <div
+        x-show="showDeactivateModal"
+        x-transition
+        class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+        @click.self="showDeactivateModal = false"
+    >
+        <div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-base font-semibold text-gray-900 mb-1">Désactiver le véhicule</h3>
+            <p class="text-sm text-gray-500 mb-4">Le véhicule sera retiré du catalogue client. Indiquez la raison.</p>
+            <form method="post" action="/admin/vehicles/{{ vehicle.id }}/deactivate">
+                <textarea
+                    name="deactivation_reason"
+                    rows="3"
+                    required
+                    maxlength="255"
+                    placeholder="ex : Véhicule vendu, en réparation, accident…"
+                    class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none resize-none mb-4"
+                ></textarea>
+                <div class="flex justify-end gap-3">
+                    <button type="button" @click="showDeactivateModal = false"
+                            class="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">
+                        Annuler
+                    </button>
+                    <button type="submit"
+                            class="bg-red-600 hover:bg-red-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors">
+                        Confirmer la désactivation
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<!-- Informations détaillées -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Caractéristiques -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Caractéristiques</h3>
+        <dl class="space-y-3">
+            {% macro row(label, value) %}
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">{{ label }}</dt>
+                <dd class="text-sm text-gray-800 font-medium text-right">{{ value if value else '—' }}</dd>
+            </div>
+            {% endmacro %}
+            {{ row("Année", vehicle.year) }}
+            {{ row("Couleur", vehicle.color) }}
+            {{ row("Carburant", fuel_labels[vehicle.fuel_type] if vehicle.fuel_type else None) }}
+            {{ row("Transmission", transmission_labels[vehicle.transmission_type] if vehicle.transmission_type else None) }}
+            {{ row("Kilométrage", "{:,} km".format(vehicle.mileage).replace(",", " ")) }}
+            {{ row("Puissance", (vehicle.engine_power | string + " ch") if vehicle.engine_power else None) }}
+        </dl>
+    </div>
+
+    <!-- Offre commerciale -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Offre commerciale</h3>
+        <dl class="space-y-3">
+            {% if vehicle.is_for_sale %}
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Type</dt>
+                <dd class="text-sm font-medium text-blue-700">Vente</dd>
+            </div>
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Prix de vente</dt>
+                <dd class="text-lg font-bold text-gray-900">
+                    {% if vehicle.selling_price %}
+                        {{ "{:,.0f}".format(vehicle.selling_price).replace(",", " ") }} €
+                    {% else %}—{% endif %}
+                </dd>
+            </div>
+            {% else %}
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Type</dt>
+                <dd class="text-sm font-medium text-purple-700">Location</dd>
+            </div>
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Loyer mensuel</dt>
+                <dd class="text-lg font-bold text-gray-900">
+                    {% if vehicle.monthly_rental_price %}
+                        {{ "{:,.0f}".format(vehicle.monthly_rental_price).replace(",", " ") }} €/mois
+                    {% else %}—{% endif %}
+                </dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+    <!-- Identification -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Identification</h3>
+        <dl class="space-y-3">
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">VIN</dt>
+                <dd class="text-sm font-mono text-gray-800">{{ vehicle.vin }}</dd>
+            </div>
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Immatriculation</dt>
+                <dd class="text-sm font-mono font-medium text-gray-800">{{ vehicle.licence_plate }}</dd>
+            </div>
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">ID interne</dt>
+                <dd class="text-sm font-mono text-gray-400">#{{ vehicle.id }}</dd>
+            </div>
+        </dl>
+    </div>
+
+    <!-- Statut & historique -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Statut & historique</h3>
+        <dl class="space-y-3">
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Créé le</dt>
+                <dd class="text-sm text-gray-700">{{ vehicle.created_at.strftime('%d/%m/%Y à %H:%M') if vehicle.created_at else '—' }}</dd>
+            </div>
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Mis à jour le</dt>
+                <dd class="text-sm text-gray-700">{{ vehicle.updated_at.strftime('%d/%m/%Y à %H:%M') if vehicle.updated_at else '—' }}</dd>
+            </div>
+            {% if vehicle.deactivated_at %}
+            <div class="flex justify-between items-baseline">
+                <dt class="text-xs text-gray-500">Désactivé le</dt>
+                <dd class="text-sm text-gray-700">{{ vehicle.deactivated_at.strftime('%d/%m/%Y à %H:%M') }}</dd>
+            </div>
+            {% endif %}
+            {% if vehicle.deactivation_reason %}
+            <div>
+                <dt class="text-xs text-gray-500 mb-1">Raison de désactivation</dt>
+                <dd class="text-sm text-gray-700 bg-gray-50 rounded-lg px-3 py-2 mt-1">{{ vehicle.deactivation_reason }}</dd>
+            </div>
+            {% endif %}
+        </dl>
+    </div>
+
+</div>
+
+<!-- Description -->
+{% if vehicle.description %}
+<div class="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <h3 class="text-sm font-semibold text-gray-900 mb-3">Description</h3>
+    <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{{ vehicle.description }}</p>
+</div>
+{% endif %}
+
+{% endblock %}
