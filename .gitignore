@@ -13,3 +13,4 @@ static/uploads/*
 htmlcov/
 .coverage
 test.db
+scripts/

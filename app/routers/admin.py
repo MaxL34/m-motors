@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
 from app.schemas.vehicle_schema import VehicleCreate, VehicleDeactivate, VehicleUpdate
 from app.services.vehicle_service import (
@@ -17,6 +18,7 @@ from app.services.vehicle_service import (
     get_vehicles,
     update_vehicle,
 )
+from app.utils.deps import require_admin
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="app/templates")
@@ -68,6 +70,7 @@ def admin_vehicles_list(
     search: Optional[str] = None,
     sort_by: Optional[str] = "created_at",
     sort_order: Optional[str] = "desc",
+    current_admin: User = Depends(require_admin),
 ):
     if sort_by not in ("brand", "created_at"):
         sort_by = "created_at"
@@ -98,7 +101,7 @@ def admin_vehicles_list(
 # ── Create ────────────────────────────────────────────────────────────────────
 
 @router.get("/vehicles/new", response_class=HTMLResponse)
-def admin_vehicle_new(request: Request):
+def admin_vehicle_new(request: Request, current_admin: User = Depends(require_admin)):
     return templates.TemplateResponse(
         name="admin/vehicles/form.html",
         request=request,
@@ -110,6 +113,7 @@ def admin_vehicle_new(request: Request):
 async def admin_vehicle_create(
     request: Request,
     db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
     vin: str = Form(...),
     licence_plate: str = Form(...),
     brand: str = Form(...),
@@ -181,6 +185,7 @@ def admin_vehicle_detail(
     db: Session = Depends(get_db),
     success: Optional[str] = None,
     error: Optional[str] = None,
+    current_admin: User = Depends(require_admin),
 ):
     vehicle = get_vehicle(db, vehicle_id)
     return templates.TemplateResponse(
@@ -197,6 +202,7 @@ def admin_vehicle_edit_form(
     request: Request,
     vehicle_id: int,
     db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
 ):
     vehicle = get_vehicle(db, vehicle_id)
     return templates.TemplateResponse(
@@ -211,6 +217,7 @@ async def admin_vehicle_edit(
     request: Request,
     vehicle_id: int,
     db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
     licence_plate: Optional[str] = Form(None),
     brand: Optional[str] = Form(None),
     model: Optional[str] = Form(None),
@@ -274,7 +281,7 @@ async def admin_vehicle_edit(
 # ── Activate / Deactivate ─────────────────────────────────────────────────────
 
 @router.post("/vehicles/{vehicle_id}/activate")
-def admin_vehicle_activate(vehicle_id: int, db: Session = Depends(get_db)):
+def admin_vehicle_activate(vehicle_id: int, db: Session = Depends(get_db), current_admin: User = Depends(require_admin)):
     try:
         activate_vehicle(db, vehicle_id)
         return RedirectResponse(
@@ -292,6 +299,7 @@ def admin_vehicle_activate(vehicle_id: int, db: Session = Depends(get_db)):
 async def admin_vehicle_deactivate(
     vehicle_id: int,
     db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
     deactivation_reason: str = Form(...),
 ):
     try:
