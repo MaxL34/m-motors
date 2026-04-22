@@ -66,9 +66,15 @@ def admin_vehicles_list(
     db: Session = Depends(get_db),
     status_filter: Optional[str] = None,
     search: Optional[str] = None,
+    sort_by: Optional[str] = "created_at",
+    sort_order: Optional[str] = "desc",
 ):
+    if sort_by not in ("brand", "created_at"):
+        sort_by = "created_at"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "desc"
     status_enum = VehicleStatus(status_filter) if status_filter in VehicleStatus._value2member_map_ else None
-    vehicles = get_vehicles(db, status=status_enum, search=search)
+    vehicles = get_vehicles(db, status=status_enum, search=search, sort_by=sort_by, sort_order=sort_order)
     all_vehicles = get_vehicles(db)
     counts = {
         "total": len(all_vehicles),
@@ -78,7 +84,14 @@ def admin_vehicles_list(
     return templates.TemplateResponse(
         name="admin/vehicles/list.html",
         request=request,
-        context=_ctx(vehicles=vehicles, status_filter=status_filter, search=search, counts=counts),
+        context=_ctx(
+            vehicles=vehicles,
+            status_filter=status_filter,
+            search=search,
+            counts=counts,
+            sort_by=sort_by,
+            sort_order=sort_order,
+        ),
     )
 
 

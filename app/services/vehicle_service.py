@@ -31,6 +31,8 @@ def get_vehicles(
     status: VehicleStatus | None = None,
     is_for_sale: bool | None = None,
     search: str | None = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
 ) -> list[Vehicle]:
     query = db.query(Vehicle)
     if status is not None:
@@ -47,6 +49,8 @@ def get_vehicles(
                 Vehicle.licence_plate.ilike(term),
             )
         )
+    sort_col = Vehicle.brand if sort_by == "brand" else Vehicle.created_at
+    query = query.order_by(sort_col.asc() if sort_order == "asc" else sort_col.desc())
     return query.all()
 
 
