@@ -12,3 +12,4 @@ static/uploads/*
 .pytest_cache/
 htmlcov/
 .coverage
+test.db

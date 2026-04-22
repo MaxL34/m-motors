@@ -1,0 +1,124 @@
+{% extends "shared/base.html" %}
+
+{% block title %}{{ vehicle.brand }} {{ vehicle.model }} — M-Motors{% endblock %}
+
+{% block content %}
+
+<!-- Retour -->
+<a href="/vehicles" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-6 transition-colors">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/>
+    </svg>
+    Retour au catalogue
+</a>
+
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+    <!-- Colonne gauche : photo + infos -->
+    <div class="lg:col-span-3 flex flex-col gap-6">
+
+        <!-- Photo placeholder -->
+        <div class="bg-gray-100 rounded-2xl h-72 flex items-center justify-center text-gray-300 border border-gray-200">
+            <svg class="w-20 h-20" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+            </svg>
+        </div>
+
+        <!-- Description -->
+        {% if vehicle.description %}
+        <div class="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Description</h3>
+            <p class="text-gray-600 text-sm leading-relaxed">{{ vehicle.description }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Caractéristiques techniques -->
+        <div class="bg-white rounded-xl border border-gray-100 p-5">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Caractéristiques</h3>
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                    <dt class="text-gray-400">Année</dt>
+                    <dd class="text-gray-900 font-medium">{{ vehicle.year }}</dd>
+                </div>
+                <div>
+                    <dt class="text-gray-400">Kilométrage</dt>
+                    <dd class="text-gray-900 font-medium">{{ "{:,}".format(vehicle.mileage).replace(",", " ") }} km</dd>
+                </div>
+                {% if vehicle.fuel_type %}
+                <div>
+                    <dt class="text-gray-400">Carburant</dt>
+                    <dd class="text-gray-900 font-medium">{{ fuel_labels[vehicle.fuel_type] }}</dd>
+                </div>
+                {% endif %}
+                {% if vehicle.transmission_type %}
+                <div>
+                    <dt class="text-gray-400">Transmission</dt>
+                    <dd class="text-gray-900 font-medium">{{ transmission_labels[vehicle.transmission_type] }}</dd>
+                </div>
+                {% endif %}
+                {% if vehicle.engine_power %}
+                <div>
+                    <dt class="text-gray-400">Puissance</dt>
+                    <dd class="text-gray-900 font-medium">{{ vehicle.engine_power }} ch</dd>
+                </div>
+                {% endif %}
+                {% if vehicle.color %}
+                <div>
+                    <dt class="text-gray-400">Couleur</dt>
+                    <dd class="text-gray-900 font-medium">{{ vehicle.color }}</dd>
+                </div>
+                {% endif %}
+            </dl>
+        </div>
+    </div>
+
+    <!-- Colonne droite : prix + CTA -->
+    <div class="lg:col-span-2 flex flex-col gap-4">
+
+        <div class="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+
+            <!-- Titre -->
+            <div class="flex items-start justify-between gap-2 mb-1">
+                <h1 class="text-2xl font-bold text-gray-900">{{ vehicle.brand }} {{ vehicle.model }}</h1>
+                {% if vehicle.is_for_sale %}
+                <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-700">Vente</span>
+                {% else %}
+                <span class="shrink-0 text-xs font-medium px-2.5 py-1 rounded-full bg-purple-50 text-purple-700">Location</span>
+                {% endif %}
+            </div>
+
+            <p class="text-sm text-gray-400 mb-6">{{ vehicle.year }}
+                {% if vehicle.fuel_type %} · {{ fuel_labels[vehicle.fuel_type] }}{% endif %}
+                · {{ "{:,}".format(vehicle.mileage).replace(",", " ") }} km
+            </p>
+
+            <!-- Prix -->
+            <div class="mb-6">
+                {% if vehicle.is_for_sale and vehicle.selling_price %}
+                    <p class="text-3xl font-bold text-gray-900">{{ "{:,.0f}".format(vehicle.selling_price).replace(",", " ") }} €</p>
+                {% elif not vehicle.is_for_sale and vehicle.monthly_rental_price %}
+                    <p class="text-3xl font-bold text-gray-900">{{ "{:,.0f}".format(vehicle.monthly_rental_price).replace(",", " ") }} €
+                        <span class="text-lg font-normal text-gray-500">/mois</span>
+                    </p>
+                {% else %}
+                    <p class="text-xl font-medium text-gray-400">Prix sur demande</p>
+                {% endif %}
+            </div>
+
+            <!-- Immatriculation -->
+            <div class="text-xs text-gray-400 font-mono bg-gray-50 rounded-lg px-3 py-2 mb-6">
+                {{ vehicle.licence_plate }}
+            </div>
+
+            <!-- CTA contact -->
+            <a href="mailto:contact@m-motors.fr?subject=Demande d'information — {{ vehicle.brand }} {{ vehicle.model }} ({{ vehicle.licence_plate }})"
+               class="block w-full text-center bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors">
+                Nous contacter
+            </a>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

@@ -8,57 +8,107 @@
     <p class="text-gray-500 mt-1">{{ vehicles | length }} véhicule(s) disponible(s)</p>
 </div>
 
+<!-- Filtres -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+    <form method="get" action="/vehicles" class="flex flex-col sm:flex-row gap-3">
+        <div class="flex-1 relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
+            </svg>
+            <input type="text" name="search" value="{{ search or '' }}"
+                   placeholder="Rechercher par marque, modèle…"
+                   class="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+        </div>
+        <select name="type_filter"
+                class="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none bg-white">
+            <option value="">Vente & Location</option>
+            <option value="sale" {% if type_filter == 'sale' %}selected{% endif %}>À vendre</option>
+            <option value="rental" {% if type_filter == 'rental' %}selected{% endif %}>À louer</option>
+        </select>
+        <button type="submit"
+                class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors whitespace-nowrap">
+            Rechercher
+        </button>
+        {% if search or type_filter %}
+        <a href="/vehicles" class="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 flex items-center">
+            Réinitialiser
+        </a>
+        {% endif %}
+    </form>
+</div>
+
 {% if vehicles %}
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    {% for vehicle in vehicles %}
-    <div class="bg-white rounded-2xl shadow hover:shadow-md transition overflow-hidden">
+    {% for v in vehicles %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden flex flex-col">
 
-        <div class="bg-gray-200 h-48 flex items-center justify-center text-gray-400 text-sm">
-            Pas de photo
+        <!-- Placeholder photo -->
+        <div class="bg-gray-100 h-44 flex items-center justify-center text-gray-300">
+            <svg class="w-16 h-16" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+            </svg>
         </div>
 
-        <div class="p-5">
-            <div class="flex items-center justify-between mb-1">
-                <h2 class="text-lg font-semibold text-gray-900">
-                    {{ vehicle.brand }} {{ vehicle.model }}
+        <div class="p-5 flex flex-col flex-1">
+            <!-- Titre + badge -->
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <h2 class="text-base font-semibold text-gray-900 leading-tight">
+                    {{ v.brand }} {{ v.model }}
                 </h2>
-                <span class="text-xs font-medium px-2 py-1 rounded-full
-                    {% if vehicle.is_for_sale %}bg-blue-100 text-blue-700{% else %}bg-green-100 text-green-700{% endif %}">
-                    {% if vehicle.is_for_sale %}Vente{% else %}Location{% endif %}
-                </span>
+                {% if v.is_for_sale %}
+                <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">Vente</span>
+                {% else %}
+                <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">Location</span>
+                {% endif %}
             </div>
 
-            <p class="text-sm text-gray-500 mb-4">
-                {{ vehicle.year }}
-                {% if vehicle.fuel_type %} · {{ vehicle.fuel_type.value }}{% endif %}
-                {% if vehicle.transmission_type %} · {{ vehicle.transmission_type.value }}{% endif %}
-                · {{ vehicle.mileage | int }} km
-            </p>
+            <!-- Infos rapides -->
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-4">
+                <span>{{ v.year }}</span>
+                {% if v.fuel_type %}
+                <span>· {{ fuel_labels[v.fuel_type] }}</span>
+                {% endif %}
+                {% if v.transmission_type %}
+                <span>· {{ transmission_labels[v.transmission_type] }}</span>
+                {% endif %}
+                <span>· {{ "{:,}".format(v.mileage).replace(",", " ") }} km</span>
+                {% if v.color %}
+                <span>· {{ v.color }}</span>
+                {% endif %}
+            </div>
 
-            <div class="flex items-center justify-between">
+            <!-- Prix + CTA -->
+            <div class="mt-auto flex items-center justify-between">
                 <span class="text-xl font-bold text-gray-900">
-                    {% if vehicle.is_for_sale and vehicle.selling_price %}
-                        {{ "%.0f" | format(vehicle.selling_price) }} €
-                    {% elif not vehicle.is_for_sale and vehicle.monthly_rental_price %}
-                        {{ "%.0f" | format(vehicle.monthly_rental_price) }} € / mois
+                    {% if v.is_for_sale and v.selling_price %}
+                        {{ "{:,.0f}".format(v.selling_price).replace(",", " ") }} €
+                    {% elif not v.is_for_sale and v.monthly_rental_price %}
+                        {{ "{:,.0f}".format(v.monthly_rental_price).replace(",", " ") }} €<span class="text-sm font-normal text-gray-500">/mois</span>
                     {% else %}
-                        Prix sur demande
+                        <span class="text-base font-medium text-gray-400">Prix sur demande</span>
                     {% endif %}
                 </span>
-                <a href="/vehicles/{{ vehicle.id }}"
-                   class="text-sm font-medium text-blue-600 hover:underline">
+                <a href="/vehicles/{{ v.id }}"
+                   class="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
                     Voir le détail →
                 </a>
             </div>
         </div>
-
     </div>
     {% endfor %}
 </div>
 
 {% else %}
-<div class="text-center py-24 text-gray-400">
-    <p class="text-xl font-medium">Aucun véhicule disponible pour le moment.</p>
+<div class="flex flex-col items-center justify-center py-24 text-gray-400">
+    <svg class="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+    </svg>
+    <p class="text-lg font-medium">Aucun véhicule disponible</p>
+    {% if search or type_filter %}
+    <p class="text-sm mt-1">Essayez de modifier votre recherche</p>
+    {% endif %}
 </div>
 {% endif %}
 {% endblock %}
