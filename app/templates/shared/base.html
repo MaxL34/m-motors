@@ -8,11 +8,17 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
-    <header class="bg-white shadow">
+    <header class="bg-white shadow-sm">
         <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
             <a href="/" class="text-2xl font-bold text-gray-900 tracking-tight">M-Motors</a>
-            <nav class="flex gap-6 text-sm font-medium text-gray-600">
-                <a href="/vehicles" class="hover:text-gray-900">Catalogue</a>
+            <nav class="flex items-center gap-4 text-sm font-medium">
+                <a href="/vehicles" class="text-gray-600 hover:text-gray-900 transition-colors">Catalogue</a>
+                <a href="/register"
+                   class="text-gray-600 hover:text-gray-900 transition-colors">Créer un compte</a>
+                <a href="/login"
+                   class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                    Se connecter
+                </a>
             </nav>
         </div>
     </header>
