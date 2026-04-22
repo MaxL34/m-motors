@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import Base, engine
-import app.models  # noqa: F401 — ensure all models are registered before create_all
+import app.models
 from app.routers import vehicles, admin
 
 Base.metadata.create_all(bind=engine)
