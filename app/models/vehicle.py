@@ -106,6 +106,7 @@ class Vehicle(Base):
 
     # Relations
     client_files: Mapped[list] = relationship("ClientFile", back_populates="vehicle")
+    favorites: Mapped[list] = relationship("Favorite", back_populates="vehicle")
     status_history: Mapped[list["VehicleStatusHistory"]] = relationship(
         "VehicleStatusHistory", back_populates="vehicle", cascade="all, delete-orphan"
     )

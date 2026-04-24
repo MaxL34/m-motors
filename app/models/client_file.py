@@ -7,11 +7,12 @@ from app.database import Base
 
 class ClientFileStatus(str, Enum):
     """Status of the client file."""
-    PENDING = "PENDING"
-    APPROVED = "APPROVED"
-    REJECTED = "REJECTED"
-    CANCELLED = "CANCELLED"
-    COMPLETED = "COMPLETED"
+    PENDING = "PENDING"         # dossier ouvert, en attente de traitement
+    IN_PROGRESS = "IN_PROGRESS" # en cours de traitement par un agent
+    APPROVED = "APPROVED"       # dossier validé
+    REJECTED = "REJECTED"       # dossier refusé
+    CANCELLED = "CANCELLED"     # dossier annulé
+    COMPLETED = "COMPLETED"     # transaction finalisée
 
 
 class ClientFileType(str, Enum):
