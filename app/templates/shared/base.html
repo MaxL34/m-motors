@@ -14,7 +14,7 @@
             <nav class="flex items-center gap-4 text-sm font-medium">
                 <a href="/vehicles" class="text-gray-600 hover:text-gray-900 transition-colors">Catalogue</a>
                 {% if current_user %}
-                <span class="text-gray-500">Bonjour, {{ current_user.first_name }}</span>
+                <span class="text-gray-500">Bonjour {{ current_user.first_name }}</span>
                 <a href="/logout" class="text-gray-600 hover:text-gray-900 transition-colors">Se déconnecter</a>
                 {% else %}
                 <a href="/register" class="text-gray-600 hover:text-gray-900 transition-colors">Créer un compte</a>

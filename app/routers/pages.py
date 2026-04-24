@@ -60,7 +60,7 @@ def login_page(request: Request, success: Optional[str] = None):
 
 @router.get("/register", response_class=HTMLResponse)
 def register_page(request: Request):
-    return templates.TemplateResponse(name="auth/register.html", request=request, context={})
+    return templates.TemplateResponse(name="auth/register.html", request=request, context={"form_data": {}, "errors": []})
 
 
 @router.get("/admin/login", response_class=HTMLResponse)
