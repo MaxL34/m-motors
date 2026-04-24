@@ -94,6 +94,7 @@ def admin_vehicles_list(
             counts=counts,
             sort_by=sort_by,
             sort_order=sort_order,
+            current_admin=current_admin,
         ),
     )
 
@@ -105,7 +106,7 @@ def admin_vehicle_new(request: Request, current_admin: User = Depends(require_ad
     return templates.TemplateResponse(
         name="admin/vehicles/form.html",
         request=request,
-        context=_ctx(vehicle=None, errors=[], form_data={}),
+        context=_ctx(vehicle=None, errors=[], form_data={}, current_admin=current_admin),
     )
 
 
@@ -164,14 +165,14 @@ async def admin_vehicle_create(
         return templates.TemplateResponse(
             name = "admin/vehicles/form.html",
             request=request,
-            context=_ctx(vehicle=None, errors=errors, form_data=form_data),
+            context=_ctx(vehicle=None, errors=errors, form_data=form_data, current_admin=current_admin),
             status_code=422,
         )
     except Exception as e:
         return templates.TemplateResponse(
             name="admin/vehicles/form.html",
             request=request,
-            context=_ctx(vehicle=None, errors=[{"msg": str(e), "loc": ""}], form_data=form_data),
+            context=_ctx(vehicle=None, errors=[{"msg": str(e), "loc": ""}], form_data=form_data, current_admin=current_admin),
             status_code=422,
         )
 
@@ -191,7 +192,7 @@ def admin_vehicle_detail(
     return templates.TemplateResponse(
         name="admin/vehicles/detail.html",
         request=request,
-        context=_ctx(vehicle=vehicle, success=success, error=error),
+        context=_ctx(vehicle=vehicle, success=success, error=error, current_admin=current_admin),
     )
 
 
@@ -208,7 +209,7 @@ def admin_vehicle_edit_form(
     return templates.TemplateResponse(
         name="admin/vehicles/form.html",
         request=request,
-        context=_ctx(vehicle=vehicle, errors=[], form_data={}),
+        context=_ctx(vehicle=vehicle, errors=[], form_data={}, current_admin=current_admin),
     )
 
 
@@ -266,14 +267,14 @@ async def admin_vehicle_edit(
         return templates.TemplateResponse(
             name="admin/vehicles/form.html",
             request=request,
-            context=_ctx(vehicle=vehicle, errors=errors, form_data=form_data),
+            context=_ctx(vehicle=vehicle, errors=errors, form_data=form_data, current_admin=current_admin),
             status_code=422,
         )
     except Exception as e:
         return templates.TemplateResponse(
             name="admin/vehicles/form.html",
             request=request,
-            context=_ctx(vehicle=vehicle, errors=[{"msg": str(e), "loc": ""}], form_data=form_data),
+            context=_ctx(vehicle=vehicle, errors=[{"msg": str(e), "loc": ""}], form_data=form_data, current_admin=current_admin),
             status_code=422,
         )
 

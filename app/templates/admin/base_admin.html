@@ -72,6 +72,10 @@
             </button>
             <h1 class="text-sm font-semibold text-gray-800 flex-1">{% block page_title %}{% endblock %}</h1>
             {% block header_actions %}{% endblock %}
+            {% if current_admin %}
+            <span class="text-sm text-gray-500">{{ current_admin.first_name }} {{ current_admin.last_name }}</span>
+            <a href="/logout" class="text-xs text-gray-400 hover:text-gray-600 transition-colors">Se déconnecter</a>
+            {% endif %}
         </header>
 
         <!-- Contenu -->
