@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
+from app.services.favorite_service import is_favorite
 from app.services.vehicle_service import get_vehicle, get_vehicles
 from app.utils.deps import get_current_user
 
@@ -64,8 +65,9 @@ def vehicle_detail(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     vehicle = get_vehicle(db, vehicle_id)
+    fav = is_favorite(db, current_user.id, vehicle_id) if current_user else False
     return templates.TemplateResponse(
         name="vehicles/detail.html",
         request=request,
-        context=_ctx(vehicle=vehicle, current_user=current_user),
+        context=_ctx(vehicle=vehicle, current_user=current_user, is_favorite=fav),
     )

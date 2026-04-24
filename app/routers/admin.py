@@ -1,15 +1,33 @@
 from typing import Optional
 
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.client_file import ClientFileStatus
+from app.models.document import DocumentType
 from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
+from app.schemas.document_schema import DocumentRefuse
 from app.schemas.vehicle_schema import VehicleCreate, VehicleDeactivate, VehicleUpdate
+from app.services.client_file_service import (
+    compute_progress,
+    get_all_client_files,
+    get_client_file,
+    update_status,
+)
+from app.services.document_service import (
+    get_document,
+    lock_document,
+    refuse_document,
+    unlock_document,
+    validate_document,
+)
 from app.services.vehicle_service import (
     activate_vehicle,
     create_vehicle,
@@ -314,3 +332,146 @@ async def admin_vehicle_deactivate(
             f"/admin/vehicles/{vehicle_id}?error={str(e)}",
             status_code=303,
         )
+
+
+# ── Customer files ────────────────────────────────────────────────────────────
+
+DOCUMENT_LABELS = {
+    DocumentType.CNI: "CNI",
+    DocumentType.DRIVING_LICENSE: "Permis de conduire",
+    DocumentType.PROOF_OF_ADDRESS: "Justificatif de domicile",
+    DocumentType.PAY_SLIP_1: "Bulletin de salaire (1/3)",
+    DocumentType.PAY_SLIP_2: "Bulletin de salaire (2/3)",
+    DocumentType.PAY_SLIP_3: "Bulletin de salaire (3/3)",
+    DocumentType.TAX_NOTICE: "Avis d'imposition",
+    DocumentType.RIB: "RIB",
+}
+
+FILE_STATUS_LABELS = {
+    "PENDING": "En attente",
+    "IN_PROGRESS": "En cours de traitement",
+    "APPROVED": "Approuvé",
+    "REJECTED": "Refusé",
+    "CANCELLED": "Annulé",
+    "COMPLETED": "Finalisé",
+}
+
+DOC_STATUS_LABELS = {
+    "PENDING": "En attente",
+    "PROCESSING": "En cours",
+    "VALIDATED": "Validé",
+    "REFUSED": "Refusé",
+}
+
+
+def _cf_ctx(**kwargs):
+    return {
+        "document_labels": DOCUMENT_LABELS,
+        "file_status_labels": FILE_STATUS_LABELS,
+        "doc_status_labels": DOC_STATUS_LABELS,
+        "client_file_statuses": list(ClientFileStatus),
+        **kwargs,
+    }
+
+
+@router.get("/customer-files", response_class=HTMLResponse)
+def admin_customer_files(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    files = get_all_client_files(db)
+    files_with_progress = [(f, compute_progress(f)) for f in files]
+    return templates.TemplateResponse(
+        name="admin/customer_files/list.html",
+        request=request,
+        context=_cf_ctx(current_admin=current_admin, files_with_progress=files_with_progress),
+    )
+
+
+@router.get("/customer-files/{file_id}", response_class=HTMLResponse)
+def admin_customer_file_detail(
+    request: Request,
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+    success: str = None,
+    error: str = None,
+):
+    client_file = get_client_file(db, file_id)
+    docs_by_type = {d.document_type: d for d in client_file.documents}
+    progress = compute_progress(client_file)
+    return templates.TemplateResponse(
+        name="admin/customer_files/detail.html",
+        request=request,
+        context=_cf_ctx(
+            current_admin=current_admin,
+            client_file=client_file,
+            docs_by_type=docs_by_type,
+            progress=progress,
+            success=success,
+            error=error,
+            document_types=list(DocumentType),
+        ),
+    )
+
+
+@router.post("/customer-files/{file_id}/status")
+def admin_update_file_status(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+    new_status: str = Form(...),
+):
+    try:
+        update_status(db, file_id, ClientFileStatus(new_status))
+        return RedirectResponse(f"/admin/customer-files/{file_id}?success=Statut+mis+à+jour", status_code=303)
+    except Exception as e:
+        return RedirectResponse(f"/admin/customer-files/{file_id}?error={str(e)}", status_code=303)
+
+
+@router.post("/documents/{doc_id}/lock")
+def admin_lock_document(doc_id: int, db: Session = Depends(get_db), current_admin: User = Depends(require_admin)):
+    doc = lock_document(db, doc_id)
+    return RedirectResponse(f"/admin/customer-files/{doc.client_file_id}?success=Document+verrouillé", status_code=303)
+
+
+@router.post("/documents/{doc_id}/unlock")
+def admin_unlock_document(doc_id: int, db: Session = Depends(get_db), current_admin: User = Depends(require_admin)):
+    doc = unlock_document(db, doc_id)
+    return RedirectResponse(f"/admin/customer-files/{doc.client_file_id}?success=Document+déverrouillé", status_code=303)
+
+
+@router.post("/documents/{doc_id}/validate")
+def admin_validate_document(doc_id: int, db: Session = Depends(get_db), current_admin: User = Depends(require_admin)):
+    doc = validate_document(db, doc_id)
+    return RedirectResponse(f"/admin/customer-files/{doc.client_file_id}?success=Document+validé", status_code=303)
+
+
+@router.post("/documents/{doc_id}/refuse")
+def admin_refuse_document(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+    rejection_reason: str = Form(...),
+):
+    doc = refuse_document(db, doc_id, DocumentRefuse(rejection_reason=rejection_reason))
+    return RedirectResponse(f"/admin/customer-files/{doc.client_file_id}?success=Document+refusé", status_code=303)
+
+
+@router.get("/documents/{doc_id}/view")
+def admin_view_document(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    doc = get_document(db, doc_id)
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Fichier introuvable sur le serveur")
+    return FileResponse(
+        path=str(file_path),
+        media_type=doc.mime_type,
+        filename=doc.file_name,
+    )
