@@ -1,7 +1,11 @@
+from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum as SqlEnum, ForeignKey, Text
+from typing import Optional
+
+from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
@@ -26,20 +30,20 @@ class DocumentStatus(str, Enum):
 class Document(Base):
     __tablename__ = "documents"
 
-    id = Column(Integer, primary_key=True, index=True)
-    client_file_id = Column(Integer, ForeignKey("client_files.id"), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    client_file_id: Mapped[int] = mapped_column(ForeignKey("client_files.id"), nullable=False)
 
-    document_type = Column(SqlEnum(DocumentType), nullable=False)
-    status = Column(SqlEnum(DocumentStatus), default=DocumentStatus.PENDING, nullable=False)
-    is_locked = Column(Boolean, default=False, nullable=False)
-    rejection_reason = Column(Text, nullable=True)
+    document_type: Mapped[DocumentType]
+    status: Mapped[DocumentStatus] = mapped_column(default=DocumentStatus.PENDING)
+    is_locked: Mapped[bool] = mapped_column(default=False)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    file_name = Column(String(255), nullable=False)
-    file_path = Column(String(255), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    mime_type = Column(String(100), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255))
+    file_path: Mapped[str] = mapped_column(String(255))
+    file_size: Mapped[int]
+    mime_type: Mapped[str] = mapped_column(String(100))
 
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     client_file = relationship("ClientFile", back_populates="documents")
