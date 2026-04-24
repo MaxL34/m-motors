@@ -113,5 +113,6 @@ async def upload_doc(
         await upload_document(db, client_file.id, DocumentType(doc_type), file)
         return RedirectResponse("/my-file?success=Document+envoyé+avec+succès", status_code=303)
     except Exception as e:
+        from urllib.parse import quote
         detail = e.detail if hasattr(e, "detail") else str(e)
-        return RedirectResponse(f"/my-file?error={detail}", status_code=303)
+        return RedirectResponse(f"/my-file?error={quote(str(detail))}", status_code=303)
