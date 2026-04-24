@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+uploads/
 static/uploads/*
 !static/uploads/.gitkeep
 *.log
