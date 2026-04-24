@@ -179,7 +179,7 @@ async def admin_vehicle_create(
             status_code=303,
         )
     except ValidationError as e:
-        errors = [{"msg": err["msg"], "loc": " → ".join(str(l) for l in err["loc"])} for err in e.errors()]
+        errors = [{"msg": err["msg"], "loc": " → ".join(str(part) for part in err["loc"])} for err in e.errors()]
         return templates.TemplateResponse(
             name = "admin/vehicles/form.html",
             request=request,
@@ -281,7 +281,7 @@ async def admin_vehicle_edit(
             status_code=303,
         )
     except ValidationError as e:
-        errors = [{"msg": err["msg"], "loc": " → ".join(str(l) for l in err["loc"])} for err in e.errors()]
+        errors = [{"msg": err["msg"], "loc": " → ".join(str(part) for part in err["loc"])} for err in e.errors()]
         return templates.TemplateResponse(
             name="admin/vehicles/form.html",
             request=request,

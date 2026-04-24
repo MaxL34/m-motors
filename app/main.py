@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.config import settings
 from app.database import Base, engine
 import app.models
 from app.routers import vehicles, admin, pages, auth, profile, client_files, favorites

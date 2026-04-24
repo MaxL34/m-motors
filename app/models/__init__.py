@@ -8,9 +8,11 @@ from app.models.document import Document, DocumentType, DocumentStatus
 from app.models.favorite import Favorite
 
 __all__ = [
+    "Base",
     "User",
     "Vehicle",
     "VehicleStatusHistory",
+    "StatusAction",
     "ClientFile",
     "ClientFileStatus",
     "ClientFileType",

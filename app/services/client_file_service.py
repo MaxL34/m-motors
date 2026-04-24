@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.client_file import ClientFile, ClientFileStatus, ClientFileType
+from app.models.client_file import ClientFile, ClientFileStatus
 from app.models.document import DocumentStatus
 from app.schemas.client_file_schema import ClientFileCreate
 
