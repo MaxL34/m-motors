@@ -8,8 +8,38 @@ from app.models.document import Document, DocumentStatus, DocumentType
 from app.schemas.document_schema import DocumentRefuse
 
 UPLOAD_DIR = Path("uploads/documents")
-ALLOWED_MIME_TYPES = {"application/pdf", "image/jpeg", "image/png"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 Mo
+
+ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+
+# Signatures magic bytes → (mime_type, extensions autorisées)
+MAGIC_SIGNATURES: list[tuple[bytes, str, set[str]]] = [
+    (b"%PDF",        "application/pdf", {".pdf"}),
+    (b"\xff\xd8\xff", "image/jpeg",     {".jpg", ".jpeg"}),
+    (b"\x89PNG",     "image/png",       {".png"}),
+]
+
+
+def _validate_file(filename: str, content: bytes) -> str:
+    """Vérifie l'extension et les magic bytes. Retourne le mime_type détecté."""
+    ext = Path(filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Extension '{ext}' non supportée. Utilisez PDF, JPG ou PNG.",
+        )
+    for signature, mime_type, valid_exts in MAGIC_SIGNATURES:
+        if content.startswith(signature):
+            if ext not in valid_exts:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Le contenu du fichier ne correspond pas à son extension.",
+                )
+            return mime_type
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail="Format non supporté. Utilisez PDF, JPG ou PNG.",
+    )
 
 
 def get_document(db: Session, doc_id: int) -> Document:
@@ -32,18 +62,15 @@ async def upload_document(
     doc_type: DocumentType,
     file: UploadFile,
 ) -> Document:
-    if file.content_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Format non supporté. Utilisez PDF, JPG ou PNG.",
-        )
-
     contents = await file.read()
+
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Fichier trop volumineux (max 5 Mo).",
         )
+
+    detected_mime = _validate_file(file.filename, contents)
 
     existing = get_document_by_type(db, client_file_id, doc_type)
     if existing and existing.is_locked:
@@ -62,7 +89,7 @@ async def upload_document(
         existing.file_name = file.filename
         existing.file_path = str(file_path)
         existing.file_size = len(contents)
-        existing.mime_type = file.content_type
+        existing.mime_type = detected_mime
         existing.status = DocumentStatus.PENDING
         existing.rejection_reason = None
         db.commit()
@@ -77,7 +104,7 @@ async def upload_document(
         file_name=file.filename,
         file_path=str(file_path),
         file_size=len(contents),
-        mime_type=file.content_type,
+        mime_type=detected_mime,
     )
     db.add(doc)
     db.commit()

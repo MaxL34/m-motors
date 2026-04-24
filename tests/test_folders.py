@@ -83,6 +83,11 @@ def make_document(db, client_file_id, doc_type=DocumentType.CNI, status=Document
     return doc
 
 
+FAKE_PDF = b"%PDF-1.4 fake pdf content"
+FAKE_JPG = b"\xff\xd8\xff fake jpeg content"
+FAKE_PNG = b"\x89PNG fake png content"
+
+
 class MockUploadFile:
     """Simule un FastAPI UploadFile pour les tests."""
     def __init__(self, content: bytes, filename: str = "test.pdf", content_type: str = "application/pdf"):
@@ -263,7 +268,7 @@ class TestUploadDocument:
         user = make_user(db)
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
-        file = MockUploadFile(b"pdf content", "cni.pdf", "application/pdf")
+        file = MockUploadFile(FAKE_PDF, "cni.pdf", "application/pdf")
 
         doc = asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
 
@@ -278,7 +283,7 @@ class TestUploadDocument:
         user = make_user(db)
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
-        file = MockUploadFile(b"pdf content", "cni.pdf", "application/pdf")
+        file = MockUploadFile(FAKE_PDF, "cni.pdf", "application/pdf")
 
         doc = asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
 
@@ -291,7 +296,7 @@ class TestUploadDocument:
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
         make_document(db, cf.id, DocumentType.CNI, status=DocumentStatus.REFUSED, is_locked=False)
-        file = MockUploadFile(b"new content", "cni_v2.pdf", "application/pdf")
+        file = MockUploadFile(FAKE_PDF, "cni_v2.pdf", "application/pdf")
 
         asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
 
@@ -304,21 +309,35 @@ class TestUploadDocument:
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
         make_document(db, cf.id, DocumentType.CNI, status=DocumentStatus.REFUSED)
-        file = MockUploadFile(b"new content", "cni_v2.pdf", "application/pdf")
+        file = MockUploadFile(FAKE_PDF, "cni_v2.pdf", "application/pdf")
 
         doc = asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
 
         assert doc.status == DocumentStatus.PENDING
         assert doc.rejection_reason is None
 
-    def test_rejects_unsupported_mime_type(self, db, tmp_path, monkeypatch):
+    def test_rejects_unsupported_extension(self, db, tmp_path, monkeypatch):
         import app.services.document_service as svc
         from fastapi import HTTPException
         monkeypatch.setattr(svc, "UPLOAD_DIR", tmp_path)
         user = make_user(db)
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
-        file = MockUploadFile(b"data", "doc.docx", "application/msword")
+        file = MockUploadFile(b"data", "doc.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
+        assert exc.value.status_code == 422
+
+    def test_rejects_pdf_extension_with_non_pdf_content(self, db, tmp_path, monkeypatch):
+        import app.services.document_service as svc
+        from fastapi import HTTPException
+        monkeypatch.setattr(svc, "UPLOAD_DIR", tmp_path)
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        # Contenu xlsx (ZIP) déguisé en .pdf
+        file = MockUploadFile(b"PK\x03\x04fake xlsx content", "cni.pdf", "application/pdf")
 
         with pytest.raises(HTTPException) as exc:
             asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
@@ -346,7 +365,7 @@ class TestUploadDocument:
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
         make_document(db, cf.id, DocumentType.CNI, is_locked=True)
-        file = MockUploadFile(b"content", "cni.pdf", "application/pdf")
+        file = MockUploadFile(FAKE_PDF, "cni.pdf", "application/pdf")
 
         with pytest.raises(HTTPException) as exc:
             asyncio.run(upload_document(db, cf.id, DocumentType.CNI, file))
