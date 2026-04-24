@@ -1,0 +1,114 @@
+{% extends "shared/base.html" %}
+{% block title %}Mon dossier — M-Motors{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Mon dossier</h1>
+
+    {% if success %}
+    <div class="mb-5 px-4 py-3 rounded-lg bg-green-50 text-green-700 text-sm">{{ success }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="mb-5 px-4 py-3 rounded-lg bg-red-50 text-red-700 text-sm">{{ error }}</div>
+    {% endif %}
+
+    {% if not client_file %}
+    <!-- Pas de dossier ouvert -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+        <p class="text-gray-500 mb-4">Vous n'avez pas encore de dossier ouvert.</p>
+        <p class="text-sm text-gray-400">Pour ouvrir un dossier, rendez-vous sur la fiche d'un véhicule qui vous intéresse.</p>
+        <a href="/vehicles" class="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+            Voir le catalogue
+        </a>
+    </div>
+
+    {% else %}
+    <!-- En-tête dossier -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <div class="flex items-start justify-between gap-4 mb-4">
+            <div>
+                <p class="text-sm text-gray-500">Véhicule</p>
+                <p class="font-semibold text-gray-900">{{ client_file.vehicle.brand }} {{ client_file.vehicle.model }} ({{ client_file.vehicle.year }})</p>
+                <p class="text-xs text-gray-400">{{ "Vente" if client_file.file_type.value == "SALE" else "Location" }}</p>
+            </div>
+            {% set s = client_file.status.value %}
+            <span class="shrink-0 text-xs font-medium px-3 py-1 rounded-full
+                {% if s == 'APPROVED' or s == 'COMPLETED' %}bg-green-50 text-green-700
+                {% elif s == 'IN_PROGRESS' %}bg-blue-50 text-blue-700
+                {% elif s == 'REJECTED' or s == 'CANCELLED' %}bg-red-50 text-red-700
+                {% else %}bg-gray-100 text-gray-600{% endif %}">
+                {{ file_status_labels[s] }}
+            </span>
+        </div>
+
+        <!-- Barre de progression -->
+        <div>
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+                <span>Avancement du dossier</span>
+                <span class="font-semibold">{{ progress }}%</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2.5">
+                <div class="h-2.5 rounded-full transition-all
+                    {% if progress == 100 %}bg-green-500{% elif progress > 50 %}bg-blue-500{% else %}bg-blue-400{% endif %}"
+                     style="width: {{ progress }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pièces justificatives -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Pièces justificatives</h2>
+
+        <div class="space-y-3">
+            {% for doc_type in document_types %}
+            {% set doc = docs_by_type.get(doc_type) %}
+            {% set doc_status = doc.status.value if doc else 'MISSING' %}
+
+            <div class="flex items-center justify-between gap-4 p-3 rounded-xl border
+                {% if doc_status == 'VALIDATED' %}border-green-200 bg-green-50
+                {% elif doc_status == 'REFUSED' %}border-red-200 bg-red-50
+                {% elif doc_status == 'PROCESSING' %}border-yellow-200 bg-yellow-50
+                {% elif doc_status == 'PENDING' %}border-blue-200 bg-blue-50
+                {% else %}border-gray-200 bg-gray-50{% endif %}">
+
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-800">{{ document_labels[doc_type] }}</p>
+                    {% if doc_status == 'VALIDATED' %}
+                    <p class="text-xs text-green-600 mt-0.5">Validé</p>
+                    {% elif doc_status == 'REFUSED' %}
+                    <p class="text-xs text-red-600 mt-0.5">Refusé{% if doc.rejection_reason %} — {{ doc.rejection_reason }}{% endif %}</p>
+                    {% elif doc_status == 'PROCESSING' %}
+                    <p class="text-xs text-yellow-700 mt-0.5">En cours de traitement (verrouillé)</p>
+                    {% elif doc_status == 'PENDING' %}
+                    <p class="text-xs text-blue-700 mt-0.5">Envoyé — en attente de vérification</p>
+                    {% else %}
+                    <p class="text-xs text-gray-400 mt-0.5">À envoyer</p>
+                    {% endif %}
+                </div>
+
+                {% if doc_status != 'VALIDATED' and doc_status != 'PROCESSING' %}
+                <form method="post" action="/my-file/documents/{{ doc_type.value }}" enctype="multipart/form-data"
+                      class="flex items-center gap-2 shrink-0">
+                    <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required
+                           class="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 max-w-[180px]">
+                    <button type="submit"
+                            class="shrink-0 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg transition-colors">
+                        Envoyer
+                    </button>
+                </form>
+                {% elif doc_status == 'VALIDATED' %}
+                <svg class="w-5 h-5 text-green-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                </svg>
+                {% else %}
+                <svg class="w-5 h-5 text-yellow-500 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
+                </svg>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
