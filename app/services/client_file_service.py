@@ -5,8 +5,14 @@ from app.models.client_file import ClientFile, ClientFileStatus
 from app.models.document import DocumentStatus
 from app.schemas.client_file_schema import ClientFileCreate
 
-# Nombre total de types de pièces justificatives requis
 TOTAL_DOCUMENT_TYPES = 8
+MAX_ACTIVE_FILES = 3
+
+ACTIVE_STATUSES = [
+    ClientFileStatus.PENDING,
+    ClientFileStatus.IN_PROGRESS,
+    ClientFileStatus.APPROVED,
+]
 
 
 def get_client_file(db: Session, file_id: int) -> ClientFile:
@@ -26,20 +32,35 @@ def get_client_file_by_user(db: Session, user_id: int) -> ClientFile | None:
     )
 
 
+def _count_active_files(db: Session, user_id: int) -> int:
+    return db.query(ClientFile).filter(
+        ClientFile.user_id == user_id,
+        ClientFile.status.in_(ACTIVE_STATUSES),
+    ).count()
+
+
 def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate) -> ClientFile:
     existing = db.query(ClientFile).filter(
         ClientFile.user_id == user_id,
         ClientFile.vehicle_id == data.vehicle_id,
     ).first()
     if existing:
-        # Réouvrir un dossier annulé ou refusé plutôt que d'en créer un nouveau
-        # (contrainte unique user_id + vehicle_id)
         if existing.status in (ClientFileStatus.CANCELLED, ClientFileStatus.REJECTED):
+            if _count_active_files(db, user_id) >= MAX_ACTIVE_FILES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Vous ne pouvez pas avoir plus de {MAX_ACTIVE_FILES} dossiers actifs simultanément.",
+                )
             existing.status = ClientFileStatus.PENDING
             existing.file_type = data.file_type
             db.commit()
             db.refresh(existing)
         return existing
+    if _count_active_files(db, user_id) >= MAX_ACTIVE_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Vous ne pouvez pas avoir plus de {MAX_ACTIVE_FILES} dossiers actifs simultanément.",
+        )
     client_file = ClientFile(
         user_id=user_id,
         vehicle_id=data.vehicle_id,
