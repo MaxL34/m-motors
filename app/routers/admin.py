@@ -422,9 +422,10 @@ def admin_update_file_status(
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
     new_status: str = Form(...),
+    cancellation_reason: str = Form(default=""),
 ):
     try:
-        update_status(db, file_id, ClientFileStatus(new_status))
+        update_status(db, file_id, ClientFileStatus(new_status), cancellation_reason or None)
         return RedirectResponse(f"/admin/customer-files/{file_id}?success=Statut+mis+à+jour", status_code=303)
     except Exception as e:
         return RedirectResponse(f"/admin/customer-files/{file_id}?error={str(e)}", status_code=303)

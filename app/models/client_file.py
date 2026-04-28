@@ -49,6 +49,7 @@ class ClientFile(Base):
 
     # Status
     status = Column(SqlEnum(ClientFileStatus), default=ClientFileStatus.PENDING, nullable=False)
+    cancellation_reason = Column(Text, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime, server_default=func.now(), nullable=False)

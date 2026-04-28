@@ -56,9 +56,18 @@ def get_all_client_files(db: Session) -> list[ClientFile]:
     return db.query(ClientFile).order_by(ClientFile.created_at.desc()).all()
 
 
-def update_status(db: Session, file_id: int, new_status: ClientFileStatus) -> ClientFile:
+def update_status(
+    db: Session,
+    file_id: int,
+    new_status: ClientFileStatus,
+    cancellation_reason: str | None = None,
+) -> ClientFile:
     client_file = get_client_file(db, file_id)
     client_file.status = new_status
+    if new_status == ClientFileStatus.CANCELLED:
+        client_file.cancellation_reason = cancellation_reason or None
+    else:
+        client_file.cancellation_reason = None
     db.commit()
     db.refresh(client_file)
     return client_file

@@ -35,7 +35,7 @@
         </div>
 
         <!-- Statut + progression -->
-        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5" x-data="{ showCancelModal: false, cancelReason: '' }">
             <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Avancement</h2>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
                 <span>Documents validés</span>
@@ -46,7 +46,13 @@
                      style="width: {{ progress }}%"></div>
             </div>
 
-            <form method="post" action="/admin/customer-files/{{ client_file.id }}/status" class="flex gap-2">
+            <form id="status-form" method="post" action="/admin/customer-files/{{ client_file.id }}/status" class="flex gap-2"
+                  @submit.prevent="
+                      const sel = $el.querySelector('[name=new_status]');
+                      if (sel.value === 'CANCELLED') { showCancelModal = true; }
+                      else { $el.submit(); }
+                  ">
+                <input type="hidden" name="cancellation_reason" :value="cancelReason">
                 <select name="new_status"
                         class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:border-indigo-500 outline-none">
                     {% for s in client_file_statuses %}
@@ -60,6 +66,30 @@
                     Mettre à jour
                 </button>
             </form>
+
+            <!-- Modal annulation -->
+            <div x-show="showCancelModal" x-cloak
+                 class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">Motif d'annulation</h3>
+                    <p class="text-xs text-gray-500 mb-3">Ce message sera visible dans le dossier du client.</p>
+                    <textarea x-model="cancelReason" rows="3"
+                              placeholder="Expliquez la raison de l'annulation…"
+                              class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-orange-400 outline-none resize-none mb-3"></textarea>
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" @click="showCancelModal = false; cancelReason = ''"
+                                class="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                            Annuler
+                        </button>
+                        <button type="button"
+                                @click="showCancelModal = false; $nextTick(() => document.getElementById('status-form').submit())"
+                                class="text-sm px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-medium transition-colors">
+                            Confirmer l'annulation
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {% if client_file.updated_at %}
             <p class="text-xs text-gray-400 mt-2">
                 Dernier statut enregistré le {{ client_file.updated_at.strftime('%d/%m/%Y à %H:%M') }}
@@ -67,25 +97,30 @@
             {% endif %}
 
             {% set s = client_file.status.value %}
-            <div class="mt-4 rounded-xl border px-4 py-3 flex items-center gap-3
+            <div class="mt-4 rounded-xl border px-4 py-3
                 {% if s == 'APPROVED' or s == 'COMPLETED' %}border-green-200 bg-green-50
                 {% elif s == 'IN_PROGRESS' %}border-blue-200 bg-blue-50
                 {% elif s == 'REJECTED' or s == 'CANCELLED' %}border-red-200 bg-red-50
                 {% else %}border-gray-200 bg-gray-50{% endif %}">
-                <span class="text-xs font-semibold uppercase tracking-wide
-                    {% if s == 'APPROVED' or s == 'COMPLETED' %}text-green-700
-                    {% elif s == 'IN_PROGRESS' %}text-blue-700
-                    {% elif s == 'REJECTED' or s == 'CANCELLED' %}text-red-700
-                    {% else %}text-gray-500{% endif %}">
-                    Statut actuel
-                </span>
-                <span class="text-sm font-semibold
-                    {% if s == 'APPROVED' or s == 'COMPLETED' %}text-green-800
-                    {% elif s == 'IN_PROGRESS' %}text-blue-800
-                    {% elif s == 'REJECTED' or s == 'CANCELLED' %}text-red-800
-                    {% else %}text-gray-700{% endif %}">
-                    {{ file_status_labels[s] }}
-                </span>
+                <div class="flex items-center gap-3">
+                    <span class="text-xs font-semibold uppercase tracking-wide
+                        {% if s == 'APPROVED' or s == 'COMPLETED' %}text-green-700
+                        {% elif s == 'IN_PROGRESS' %}text-blue-700
+                        {% elif s == 'REJECTED' or s == 'CANCELLED' %}text-red-700
+                        {% else %}text-gray-500{% endif %}">
+                        Statut actuel
+                    </span>
+                    <span class="text-sm font-semibold
+                        {% if s == 'APPROVED' or s == 'COMPLETED' %}text-green-800
+                        {% elif s == 'IN_PROGRESS' %}text-blue-800
+                        {% elif s == 'REJECTED' or s == 'CANCELLED' %}text-red-800
+                        {% else %}text-gray-700{% endif %}">
+                        {{ file_status_labels[s] }}
+                    </span>
+                </div>
+                {% if s == 'CANCELLED' and client_file.cancellation_reason %}
+                <p class="text-xs text-red-600 mt-1">{{ client_file.cancellation_reason }}</p>
+                {% endif %}
             </div>
         </div>
     </div>
