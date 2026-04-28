@@ -17,6 +17,7 @@ from app.services.client_file_service import (
     get_or_create_client_file,
     update_status,
     TOTAL_DOCUMENT_TYPES,
+    MAX_ACTIVE_FILES,
 )
 from app.services.document_service import (
     lock_document,
@@ -206,15 +207,109 @@ class TestUpdateStatus:
 
         assert updated.status == ClientFileStatus.IN_PROGRESS
 
-    def test_all_statuses_are_applicable(self, db):
+    def test_all_statuses_except_approved_are_applicable(self, db):
         user = make_user(db)
         vehicle = make_vehicle(db)
         cf = make_client_file(db, user.id, vehicle.id)
 
-        for s in [ClientFileStatus.IN_PROGRESS, ClientFileStatus.APPROVED, ClientFileStatus.REJECTED]:
+        for s in [ClientFileStatus.IN_PROGRESS, ClientFileStatus.REJECTED, ClientFileStatus.CANCELLED]:
             update_status(db, cf.id, s)
             db.refresh(cf)
             assert cf.status == s
+
+    def test_approved_raises_if_documents_not_all_validated(self, db):
+        from fastapi import HTTPException
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        make_document(db, cf.id, DocumentType.CNI, status=DocumentStatus.VALIDATED)
+
+        with pytest.raises(HTTPException) as exc:
+            update_status(db, cf.id, ClientFileStatus.APPROVED)
+        assert exc.value.status_code == 400
+
+    def test_approved_succeeds_when_all_documents_validated(self, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        for doc_type in DocumentType:
+            make_document(db, cf.id, doc_type, status=DocumentStatus.VALIDATED)
+        db.refresh(cf)
+
+        updated = update_status(db, cf.id, ClientFileStatus.APPROVED)
+
+        assert updated.status == ClientFileStatus.APPROVED
+
+    def test_cancelled_saves_cancellation_reason(self, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+
+        updated = update_status(db, cf.id, ClientFileStatus.CANCELLED, cancellation_reason="Doublon")
+
+        assert updated.cancellation_reason == "Doublon"
+        assert updated.rejection_reason is None
+
+    def test_rejected_saves_rejection_reason(self, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+
+        updated = update_status(db, cf.id, ClientFileStatus.REJECTED, rejection_reason="Pièces invalides")
+
+        assert updated.rejection_reason == "Pièces invalides"
+        assert updated.cancellation_reason is None
+
+    def test_changing_status_clears_previous_reason(self, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        update_status(db, cf.id, ClientFileStatus.CANCELLED, cancellation_reason="Raison A")
+
+        updated = update_status(db, cf.id, ClientFileStatus.PENDING)
+
+        assert updated.cancellation_reason is None
+        assert updated.rejection_reason is None
+
+
+class TestActiveFilesLimit:
+
+    def test_raises_when_max_active_files_reached(self, db):
+        from fastapi import HTTPException
+        user = make_user(db)
+        for i in range(MAX_ACTIVE_FILES):
+            v = make_vehicle(db, vin=f"VIN00000000000{i:04d}")
+            make_client_file(db, user.id, v.id, status=ClientFileStatus.PENDING)
+        extra_vehicle = make_vehicle(db, vin="VIN999999999EXTRA")
+        data = ClientFileCreate(vehicle_id=extra_vehicle.id, file_type=ClientFileType.SALE)
+
+        with pytest.raises(HTTPException) as exc:
+            get_or_create_client_file(db, user.id, data)
+        assert exc.value.status_code == 400
+
+    def test_raises_when_reopening_with_max_active_files_reached(self, db):
+        from fastapi import HTTPException
+        user = make_user(db)
+        vehicles = []
+        for i in range(MAX_ACTIVE_FILES):
+            v = make_vehicle(db, vin=f"VIN10000000000{i:04d}")
+            make_client_file(db, user.id, v.id, status=ClientFileStatus.PENDING)
+            vehicles.append(v)
+        cancelled_v = make_vehicle(db, vin="VIN_CANCELLED_001")
+        make_client_file(db, user.id, cancelled_v.id, status=ClientFileStatus.CANCELLED)
+        data = ClientFileCreate(vehicle_id=cancelled_v.id, file_type=ClientFileType.SALE)
+
+        with pytest.raises(HTTPException) as exc:
+            get_or_create_client_file(db, user.id, data)
+        assert exc.value.status_code == 400
+
+    def test_allows_creating_up_to_max_active_files(self, db):
+        user = make_user(db)
+        for i in range(MAX_ACTIVE_FILES):
+            v = make_vehicle(db, vin=f"VIN20000000000{i:04d}")
+            data = ClientFileCreate(vehicle_id=v.id, file_type=ClientFileType.SALE)
+            cf = get_or_create_client_file(db, user.id, data)
+            assert cf.status == ClientFileStatus.PENDING
 
 
 class TestComputeProgress:
