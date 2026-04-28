@@ -64,6 +64,13 @@ def update_status(
     rejection_reason: str | None = None,
 ) -> ClientFile:
     client_file = get_client_file(db, file_id)
+    if new_status == ClientFileStatus.APPROVED:
+        validated = sum(1 for d in client_file.documents if d.status == DocumentStatus.VALIDATED)
+        if validated < TOTAL_DOCUMENT_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Impossible d'approuver le dossier : {validated}/{TOTAL_DOCUMENT_TYPES} document(s) validé(s).",
+            )
     client_file.status = new_status
     client_file.cancellation_reason = cancellation_reason or None if new_status == ClientFileStatus.CANCELLED else None
     client_file.rejection_reason = rejection_reason or None if new_status == ClientFileStatus.REJECTED else None
