@@ -32,6 +32,16 @@ def get_client_file_by_user(db: Session, user_id: int) -> ClientFile | None:
     )
 
 
+def get_all_active_client_files_by_user(db: Session, user_id: int) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.user_id == user_id)
+        .filter(ClientFile.status.notin_([ClientFileStatus.CANCELLED]))
+        .order_by(ClientFile.created_at.desc())
+        .all()
+    )
+
+
 def _count_active_files(db: Session, user_id: int) -> int:
     return db.query(ClientFile).filter(
         ClientFile.user_id == user_id,

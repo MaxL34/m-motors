@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -10,7 +12,8 @@ from app.models.user import User
 from app.schemas.client_file_schema import ClientFileCreate
 from app.services.client_file_service import (
     compute_progress,
-    get_client_file_by_user,
+    get_all_active_client_files_by_user,
+    get_client_file,
     get_or_create_client_file,
 )
 from app.services.document_service import upload_document
@@ -46,6 +49,15 @@ FILE_STATUS_LABELS = {
     "COMPLETED": "Finalisé",
 }
 
+FILE_STATUS_COLORS = {
+    "APPROVED": "bg-green-50 text-green-700",
+    "COMPLETED": "bg-green-50 text-green-700",
+    "IN_PROGRESS": "bg-blue-50 text-blue-700",
+    "REJECTED": "bg-red-50 text-red-700",
+    "CANCELLED": "bg-red-50 text-red-700",
+    "PENDING": "bg-gray-100 text-gray-600",
+}
+
 
 def _ctx(**kwargs):
     return {
@@ -53,26 +65,52 @@ def _ctx(**kwargs):
         "document_types": list(DocumentType),
         "status_labels": STATUS_LABELS,
         "file_status_labels": FILE_STATUS_LABELS,
+        "file_status_colors": FILE_STATUS_COLORS,
         **kwargs,
     }
 
 
 @router.get("/my-file", response_class=HTMLResponse)
-def my_file(
+def my_file_list(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
     success: str = None,
     error: str = None,
 ):
-    client_file = get_client_file_by_user(db, current_user.id)
-    progress = compute_progress(client_file) if client_file else 0
-    docs_by_type = {}
-    if client_file:
-        docs_by_type = {d.document_type: d for d in client_file.documents}
-
+    client_files = get_all_active_client_files_by_user(db, current_user.id)
+    files_with_progress = [
+        {"file": cf, "progress": compute_progress(cf)}
+        for cf in client_files
+    ]
     return templates.TemplateResponse(
         name="customer_file/index.html",
+        request=request,
+        context=_ctx(
+            current_user=current_user,
+            files_with_progress=files_with_progress,
+            success=success,
+            error=error,
+        ),
+    )
+
+
+@router.get("/my-file/{file_id}", response_class=HTMLResponse)
+def my_file_detail(
+    request: Request,
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+    success: str = None,
+    error: str = None,
+):
+    client_file = get_client_file(db, file_id)
+    if client_file.user_id != current_user.id:
+        return RedirectResponse("/my-file", status_code=303)
+    progress = compute_progress(client_file)
+    docs_by_type = {d.document_type: d for d in client_file.documents}
+    return templates.TemplateResponse(
+        name="customer_file/detail.html",
         request=request,
         context=_ctx(
             current_user=current_user,
@@ -85,14 +123,15 @@ def my_file(
     )
 
 
-@router.get("/api/my-file/status")
+@router.get("/api/my-file/{file_id}/status")
 def my_file_status(
+    file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
-    client_file = get_client_file_by_user(db, current_user.id)
-    if not client_file:
-        return JSONResponse({"status": None, "label": None, "updated_at": None})
+    client_file = get_client_file(db, file_id)
+    if client_file.user_id != current_user.id:
+        return JSONResponse({"status": None, "label": None}, status_code=403)
     return JSONResponse({
         "status": client_file.status.value,
         "label": FILE_STATUS_LABELS[client_file.status.value],
@@ -109,7 +148,6 @@ def open_file(
     file_type: str = Form(...),
 ):
     from fastapi import HTTPException as _HTTPException
-    from urllib.parse import quote
     try:
         data = ClientFileCreate(vehicle_id=vehicle_id, file_type=ClientFileType(file_type))
         get_or_create_client_file(db, current_user.id, data)
@@ -118,21 +156,21 @@ def open_file(
         return RedirectResponse(f"/vehicles/{vehicle_id}?error={quote(e.detail)}", status_code=303)
 
 
-@router.post("/my-file/documents/{doc_type}", response_class=HTMLResponse)
+@router.post("/my-file/{file_id}/documents/{doc_type}", response_class=HTMLResponse)
 async def upload_doc(
     request: Request,
+    file_id: int,
     doc_type: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
     file: UploadFile = File(...),
 ):
-    client_file = get_client_file_by_user(db, current_user.id)
-    if not client_file:
-        return RedirectResponse("/my-file?error=Aucun+dossier+ouvert", status_code=303)
+    client_file = get_client_file(db, file_id)
+    if client_file.user_id != current_user.id:
+        return RedirectResponse("/my-file", status_code=303)
     try:
         await upload_document(db, client_file.id, DocumentType(doc_type), file)
-        return RedirectResponse("/my-file?success=Document+envoyé+avec+succès", status_code=303)
+        return RedirectResponse(f"/my-file/{file_id}?success=Document+envoyé+avec+succès", status_code=303)
     except Exception as e:
-        from urllib.parse import quote
         detail = e.detail if hasattr(e, "detail") else str(e)
-        return RedirectResponse(f"/my-file?error={quote(str(detail))}", status_code=303)
+        return RedirectResponse(f"/my-file/{file_id}?error={quote(str(detail))}", status_code=303)
