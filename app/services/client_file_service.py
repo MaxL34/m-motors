@@ -61,13 +61,12 @@ def update_status(
     file_id: int,
     new_status: ClientFileStatus,
     cancellation_reason: str | None = None,
+    rejection_reason: str | None = None,
 ) -> ClientFile:
     client_file = get_client_file(db, file_id)
     client_file.status = new_status
-    if new_status == ClientFileStatus.CANCELLED:
-        client_file.cancellation_reason = cancellation_reason or None
-    else:
-        client_file.cancellation_reason = None
+    client_file.cancellation_reason = cancellation_reason or None if new_status == ClientFileStatus.CANCELLED else None
+    client_file.rejection_reason = rejection_reason or None if new_status == ClientFileStatus.REJECTED else None
     db.commit()
     db.refresh(client_file)
     return client_file

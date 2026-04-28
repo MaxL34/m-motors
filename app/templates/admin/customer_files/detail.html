@@ -35,7 +35,8 @@
         </div>
 
         <!-- Statut + progression -->
-        <div class="bg-white rounded-2xl border border-gray-100 p-5" x-data="{ showCancelModal: false, cancelReason: '' }">
+        <div class="bg-white rounded-2xl border border-gray-100 p-5"
+             x-data="{ showConfirmModal: false, showCancelModal: false, showRejectModal: false, cancelReason: '', rejectReason: '', pendingLabel: '' }">
             <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Avancement</h2>
             <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
                 <span>Documents validés</span>
@@ -49,10 +50,13 @@
             <form id="status-form" method="post" action="/admin/customer-files/{{ client_file.id }}/status" class="flex gap-2"
                   @submit.prevent="
                       const sel = $el.querySelector('[name=new_status]');
+                      pendingLabel = sel.options[sel.selectedIndex].text;
                       if (sel.value === 'CANCELLED') { showCancelModal = true; }
-                      else { $el.submit(); }
+                      else if (sel.value === 'REJECTED') { showRejectModal = true; }
+                      else { showConfirmModal = true; }
                   ">
                 <input type="hidden" name="cancellation_reason" :value="cancelReason">
+                <input type="hidden" name="rejection_reason" :value="rejectReason">
                 <select name="new_status"
                         class="flex-1 text-sm border border-gray-300 rounded-lg px-2 py-1.5 bg-white focus:border-indigo-500 outline-none">
                     {% for s in client_file_statuses %}
@@ -66,6 +70,51 @@
                     Mettre à jour
                 </button>
             </form>
+
+            <!-- Modal confirmation générale -->
+            <div x-show="showConfirmModal" x-cloak
+                 class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+                    <h3 class="text-base font-semibold text-gray-900 mb-2">Confirmer la mise à jour</h3>
+                    <p class="text-sm text-gray-500 mb-4">
+                        Voulez-vous passer le statut du dossier à <span class="font-semibold text-gray-800" x-text="pendingLabel"></span> ?
+                    </p>
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" @click="showConfirmModal = false"
+                                class="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                            Annuler
+                        </button>
+                        <button type="button"
+                                @click="showConfirmModal = false; $nextTick(() => document.getElementById('status-form').submit())"
+                                class="text-sm px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition-colors">
+                            Confirmer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal refus -->
+            <div x-show="showRejectModal" x-cloak
+                 class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+                    <h3 class="text-base font-semibold text-gray-900 mb-1">Motif de refus</h3>
+                    <p class="text-xs text-gray-500 mb-3">Ce message sera visible dans le dossier du client.</p>
+                    <textarea x-model="rejectReason" rows="3"
+                              placeholder="Expliquez la raison du refus…"
+                              class="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:border-red-400 outline-none resize-none mb-3"></textarea>
+                    <div class="flex gap-2 justify-end">
+                        <button type="button" @click="showRejectModal = false; rejectReason = ''"
+                                class="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                            Annuler
+                        </button>
+                        <button type="button"
+                                @click="showRejectModal = false; $nextTick(() => document.getElementById('status-form').submit())"
+                                class="text-sm px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors">
+                            Confirmer le refus
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Modal annulation -->
             <div x-show="showCancelModal" x-cloak
@@ -118,6 +167,9 @@
                         {{ file_status_labels[s] }}
                     </span>
                 </div>
+                {% if s == 'REJECTED' and client_file.rejection_reason %}
+                <p class="text-xs text-red-600 mt-1">{{ client_file.rejection_reason }}</p>
+                {% endif %}
                 {% if s == 'CANCELLED' and client_file.cancellation_reason %}
                 <p class="text-xs text-red-600 mt-1">{{ client_file.cancellation_reason }}</p>
                 {% endif %}
