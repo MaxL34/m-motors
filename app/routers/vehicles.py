@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
-from app.services.favorite_service import is_favorite
+from app.services.favorite_service import get_favorites, is_favorite
 from app.services.vehicle_service import get_vehicle, get_vehicles
 from app.utils.deps import get_current_user
 
@@ -50,10 +50,17 @@ def catalog(
         is_for_sale = False
 
     vehicles = get_vehicles(db, status=VehicleStatus.ACTIVE, search=search, is_for_sale=is_for_sale)
+    top_favorites = get_favorites(db, current_user.id)[:2] if current_user else []
     return templates.TemplateResponse(
         name="vehicles/catalog.html",
         request=request,
-        context=_ctx(vehicles=vehicles, search=search, type_filter=type_filter, current_user=current_user),
+        context=_ctx(
+            vehicles=vehicles,
+            search=search,
+            type_filter=type_filter,
+            current_user=current_user,
+            top_favorites=top_favorites,
+        ),
     )
 
 
