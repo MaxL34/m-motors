@@ -63,11 +63,12 @@ def vehicle_detail(
     vehicle_id: int,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
+    error: Optional[str] = None,
 ):
     vehicle = get_vehicle(db, vehicle_id)
     fav = is_favorite(db, current_user.id, vehicle_id) if current_user else False
     return templates.TemplateResponse(
         name="vehicles/detail.html",
         request=request,
-        context=_ctx(vehicle=vehicle, current_user=current_user, is_favorite=fav),
+        context=_ctx(vehicle=vehicle, current_user=current_user, is_favorite=fav, error=error),
     )

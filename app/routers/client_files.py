@@ -108,9 +108,14 @@ def open_file(
     vehicle_id: int = Form(...),
     file_type: str = Form(...),
 ):
-    data = ClientFileCreate(vehicle_id=vehicle_id, file_type=ClientFileType(file_type))
-    get_or_create_client_file(db, current_user.id, data)
-    return RedirectResponse("/my-file?success=Dossier+ouvert+avec+succès", status_code=303)
+    from fastapi import HTTPException as _HTTPException
+    from urllib.parse import quote
+    try:
+        data = ClientFileCreate(vehicle_id=vehicle_id, file_type=ClientFileType(file_type))
+        get_or_create_client_file(db, current_user.id, data)
+        return RedirectResponse("/my-file?success=Dossier+ouvert+avec+succès", status_code=303)
+    except _HTTPException as e:
+        return RedirectResponse(f"/vehicles/{vehicle_id}?error={quote(e.detail)}", status_code=303)
 
 
 @router.post("/my-file/documents/{doc_type}", response_class=HTMLResponse)
