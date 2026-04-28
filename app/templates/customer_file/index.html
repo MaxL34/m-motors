@@ -32,7 +32,7 @@
                 <p class="text-xs text-gray-400">{{ "Vente" if client_file.file_type.value == "SALE" else "Location" }}</p>
             </div>
             {% set s = client_file.status.value %}
-            <span class="shrink-0 text-xs font-medium px-3 py-1 rounded-full
+            <span id="file-status-badge" data-status="{{ s }}" class="shrink-0 text-xs font-medium px-3 py-1 rounded-full
                 {% if s == 'APPROVED' or s == 'COMPLETED' %}bg-green-50 text-green-700
                 {% elif s == 'IN_PROGRESS' %}bg-blue-50 text-blue-700
                 {% elif s == 'REJECTED' or s == 'CANCELLED' %}bg-red-50 text-red-700
@@ -111,4 +111,42 @@
     </div>
     {% endif %}
 </div>
+
+{% if client_file %}
+<script>
+(function () {
+    const badge = document.getElementById('file-status-badge');
+    if (!badge) return;
+
+    const STATUS_CLASSES = {
+        APPROVED:  'bg-green-50 text-green-700',
+        COMPLETED: 'bg-green-50 text-green-700',
+        IN_PROGRESS: 'bg-blue-50 text-blue-700',
+        REJECTED:  'bg-red-50 text-red-700',
+        CANCELLED: 'bg-red-50 text-red-700',
+        PENDING:   'bg-gray-100 text-gray-600',
+    };
+    const ALL_CLASSES = Object.values(STATUS_CLASSES).join(' ').split(' ');
+
+    function applyStatus(status, label) {
+        badge.textContent = label;
+        badge.dataset.status = status;
+        badge.classList.remove(...ALL_CLASSES);
+        const cls = STATUS_CLASSES[status] || STATUS_CLASSES.PENDING;
+        badge.classList.add(...cls.split(' '));
+    }
+
+    setInterval(async function () {
+        try {
+            const res = await fetch('/api/my-file/status');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.status && data.status !== badge.dataset.status) {
+                applyStatus(data.status, data.label);
+            }
+        } catch (_) {}
+    }, 5000);
+})();
+</script>
+{% endif %}
 {% endblock %}

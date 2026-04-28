@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -83,6 +83,21 @@ def my_file(
             error=error,
         ),
     )
+
+
+@router.get("/api/my-file/status")
+def my_file_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    client_file = get_client_file_by_user(db, current_user.id)
+    if not client_file:
+        return JSONResponse({"status": None, "label": None, "updated_at": None})
+    return JSONResponse({
+        "status": client_file.status.value,
+        "label": FILE_STATUS_LABELS[client_file.status.value],
+        "updated_at": client_file.updated_at.isoformat() if client_file.updated_at else None,
+    })
 
 
 @router.post("/my-file/open", response_class=HTMLResponse)

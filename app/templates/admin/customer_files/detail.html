@@ -60,6 +60,33 @@
                     Mettre à jour
                 </button>
             </form>
+            {% if client_file.updated_at %}
+            <p class="text-xs text-gray-400 mt-2">
+                Dernier statut enregistré le {{ client_file.updated_at.strftime('%d/%m/%Y à %H:%M') }}
+            </p>
+            {% endif %}
+
+            {% set s = client_file.status.value %}
+            <div class="mt-4 rounded-xl border px-4 py-3 flex items-center gap-3
+                {% if s == 'APPROVED' or s == 'COMPLETED' %}border-green-200 bg-green-50
+                {% elif s == 'IN_PROGRESS' %}border-blue-200 bg-blue-50
+                {% elif s == 'REJECTED' or s == 'CANCELLED' %}border-red-200 bg-red-50
+                {% else %}border-gray-200 bg-gray-50{% endif %}">
+                <span class="text-xs font-semibold uppercase tracking-wide
+                    {% if s == 'APPROVED' or s == 'COMPLETED' %}text-green-700
+                    {% elif s == 'IN_PROGRESS' %}text-blue-700
+                    {% elif s == 'REJECTED' or s == 'CANCELLED' %}text-red-700
+                    {% else %}text-gray-500{% endif %}">
+                    Statut actuel
+                </span>
+                <span class="text-sm font-semibold
+                    {% if s == 'APPROVED' or s == 'COMPLETED' %}text-green-800
+                    {% elif s == 'IN_PROGRESS' %}text-blue-800
+                    {% elif s == 'REJECTED' or s == 'CANCELLED' %}text-red-800
+                    {% else %}text-gray-700{% endif %}">
+                    {{ file_status_labels[s] }}
+                </span>
+            </div>
         </div>
     </div>
 
