@@ -12,6 +12,7 @@ uploads/
 .vscode/
 .pytest_cache/
 htmlcov/
+reports/
 .coverage
 test.db
 scripts/
