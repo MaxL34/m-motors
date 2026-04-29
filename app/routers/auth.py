@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.schemas.user_schema import UserCreate
 from app.services.auth_service import authenticate_user, create_user_with_hash, get_user_by_email
+from app.services.email_service import send_confirmation_email
 from app.services.otp_service import create_registration_otp, send_otp_sms, verify_registration_otp
 from app.utils.security import create_access_token, hash_password
 
@@ -124,7 +125,8 @@ async def post_verify_registration(
         )
 
     try:
-        create_user_with_hash(db, registration_data)
+        user = create_user_with_hash(db, registration_data)
+        send_confirmation_email(user.email, user.first_name)
     except Exception as e:
         response = RedirectResponse("/register", status_code=303)
         response.delete_cookie(PENDING_COOKIE_NAME)
