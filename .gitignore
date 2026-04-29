@@ -6,6 +6,7 @@ __pycache__/
 .env
 static/uploads/*
 !static/uploads/.gitkeep
+uploads/
 *.log
 .DS_Store
 .vscode/
