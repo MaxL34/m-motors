@@ -2,7 +2,7 @@ from typing import Optional
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
@@ -428,8 +428,12 @@ def admin_update_file_status(
     try:
         update_status(db, file_id, ClientFileStatus(new_status), cancellation_reason or None, rejection_reason or None)
         return RedirectResponse(f"/admin/customer-files/{file_id}?success=Statut+mis+à+jour", status_code=303)
+    except HTTPException as e:
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin/customer-files/{file_id}?error={quote(e.detail)}", status_code=303)
     except Exception as e:
-        return RedirectResponse(f"/admin/customer-files/{file_id}?error={str(e)}", status_code=303)
+        from urllib.parse import quote
+        return RedirectResponse(f"/admin/customer-files/{file_id}?error={quote(str(e))}", status_code=303)
 
 
 @router.post("/documents/{doc_id}/lock")

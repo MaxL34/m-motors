@@ -1,0 +1,73 @@
+{% extends "shared/base.html" %}
+{% block title %}Mes favoris — M-Motors{% endblock %}
+
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Mes favoris</h1>
+        <p class="text-gray-500 mt-1">{{ favorites | length }} véhicule(s) en favori</p>
+    </div>
+    <a href="/vehicles" class="text-sm text-gray-500 hover:text-gray-700 transition-colors">← Retour au catalogue</a>
+</div>
+
+{% if favorites %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for v in favorites %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+
+        <div class="bg-gray-100 h-44 flex items-center justify-center text-gray-300">
+            <svg class="w-16 h-16" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+            </svg>
+        </div>
+
+        <div class="p-5 flex flex-col flex-1">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <h2 class="text-base font-semibold text-gray-900 leading-tight">{{ v.brand }} {{ v.model }}</h2>
+                {% if v.is_for_sale %}
+                <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">Vente</span>
+                {% else %}
+                <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">Location</span>
+                {% endif %}
+            </div>
+
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-4">
+                <span>{{ v.year }}</span>
+                {% if v.fuel_type %}<span>· {{ fuel_labels[v.fuel_type] }}</span>{% endif %}
+                {% if v.transmission_type %}<span>· {{ transmission_labels[v.transmission_type] }}</span>{% endif %}
+                <span>· {{ "{:,}".format(v.mileage).replace(",", " ") }} km</span>
+            </div>
+
+            <div class="mt-auto flex items-center justify-between">
+                <span class="text-xl font-bold text-gray-900">
+                    {% if v.is_for_sale and v.selling_price %}
+                        {{ "{:,.0f}".format(v.selling_price).replace(",", " ") }} €
+                    {% elif not v.is_for_sale and v.monthly_rental_price %}
+                        {{ "{:,.0f}".format(v.monthly_rental_price).replace(",", " ") }} €<span class="text-sm font-normal text-gray-500">/mois</span>
+                    {% else %}
+                        <span class="text-base font-medium text-gray-400">Prix sur demande</span>
+                    {% endif %}
+                </span>
+                <a href="/vehicles/{{ v.id }}"
+                   class="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                    Voir le détail →
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="flex flex-col items-center justify-center py-24 text-gray-400">
+    <svg class="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z"/>
+    </svg>
+    <p class="text-lg font-medium text-gray-500">Aucun favori pour le moment</p>
+    <a href="/vehicles" class="mt-4 text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
+        Parcourir le catalogue →
+    </a>
+</div>
+{% endif %}
+{% endblock %}
