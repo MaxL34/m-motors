@@ -80,10 +80,22 @@ def create_user_with_hash(db: Session, data: dict) -> User:
     return user
 
 
-def authenticate_user(db: Session, email: str, password: str) -> User | None:
+MAX_LOGIN_ATTEMPTS = 3
+
+
+def authenticate_user(db: Session, email: str, password: str) -> tuple[User | None, str | None]:
+    """Returns (user, error) where error is None on success, 'locked' or 'invalid' on failure."""
     user = get_user_by_email(db, email)
-    if not user or not verify_password(password, user.password_hash):
-        return None
-    if not user.is_active:
-        return None
-    return user
+    if not user or not user.is_active:
+        return None, "invalid"
+    if user.is_locked:
+        return None, "locked"
+    if not verify_password(password, user.password_hash):
+        user.failed_login_attempts += 1
+        if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
+            user.is_locked = True
+        db.commit()
+        return None, "invalid"
+    user.failed_login_attempts = 0
+    db.commit()
+    return user, None

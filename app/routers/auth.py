@@ -149,7 +149,14 @@ async def login(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    user = authenticate_user(db, email, password)
+    user, error = authenticate_user(db, email, password)
+    if error == "locked":
+        return templates.TemplateResponse(
+            name="auth/login.html",
+            request=request,
+            context={"error": "Votre compte est bloqué suite à trop de tentatives échouées. Contactez l'assistance.", "form_email": email},
+            status_code=403,
+        )
     if not user:
         return templates.TemplateResponse(
             name="auth/login.html",
@@ -180,7 +187,7 @@ async def admin_login(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    user = authenticate_user(db, email, password)
+    user, error = authenticate_user(db, email, password)
     if not user or not user.is_admin:
         return templates.TemplateResponse(
             name="auth/admin_login.html",
