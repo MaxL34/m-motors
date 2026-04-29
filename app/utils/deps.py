@@ -23,6 +23,21 @@ def get_current_user(
     return user if user and user.is_active is not False else None
 
 
+def require_user(
+    db: Session = Depends(get_db),
+    access_token: Optional[str] = Cookie(default=None),
+) -> User:
+    if not access_token:
+        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
+    payload = decode_access_token(access_token)
+    if not payload or payload.get("is_admin"):
+        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
+    user = db.query(User).filter(User.id == int(payload["sub"])).first()
+    if not user or user.is_active is False:
+        raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
+    return user
+
+
 def require_admin(
     db: Session = Depends(get_db),
     access_token: Optional[str] = Cookie(default=None),
