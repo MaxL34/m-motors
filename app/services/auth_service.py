@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -81,21 +83,44 @@ def create_user_with_hash(db: Session, data: dict) -> User:
 
 
 MAX_LOGIN_ATTEMPTS = 3
+LOCK_DURATION_MINUTES = 10
 
 
 def authenticate_user(db: Session, email: str, password: str) -> tuple[User | None, str | None]:
-    """Returns (user, error) where error is None on success, 'locked' or 'invalid' on failure."""
+    """Returns (user, error).
+
+    error values:
+      None          → success
+      "invalid"     → wrong credentials or inactive
+      "locked"      → account locked, lock window not yet elapsed
+      "unlock_ready"→ account locked but 10-minute window has passed, OTP required
+    """
     user = get_user_by_email(db, email)
     if not user or not user.is_active:
         return None, "invalid"
+
     if user.is_locked:
-        return None, "locked"
+        if user.locked_at:
+            locked_at = user.locked_at.replace(tzinfo=timezone.utc) if user.locked_at.tzinfo is None else user.locked_at
+            if datetime.now(timezone.utc) >= locked_at + timedelta(minutes=LOCK_DURATION_MINUTES):
+                return user, "unlock_ready"
+        return user, "locked"
+
     if not verify_password(password, user.password_hash):
         user.failed_login_attempts += 1
         if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
             user.is_locked = True
+            user.locked_at = datetime.now(timezone.utc)
         db.commit()
         return None, "invalid"
+
     user.failed_login_attempts = 0
     db.commit()
     return user, None
+
+
+def unlock_user(db: Session, user: User) -> None:
+    user.is_locked = False
+    user.failed_login_attempts = 0
+    user.locked_at = None
+    db.commit()

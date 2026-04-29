@@ -20,8 +20,10 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.add_column("users", sa.Column("is_locked", sa.Boolean(), nullable=False, server_default="false"))
     op.add_column("users", sa.Column("failed_login_attempts", sa.Integer(), nullable=False, server_default="0"))
+    op.add_column("users", sa.Column("locked_at", sa.DateTime(timezone=True), nullable=True))
 
 
 def downgrade() -> None:
+    op.drop_column("users", "locked_at")
     op.drop_column("users", "failed_login_attempts")
     op.drop_column("users", "is_locked")
