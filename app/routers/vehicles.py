@@ -50,7 +50,7 @@ def catalog(
         is_for_sale = False
 
     vehicles = get_vehicles(db, status=VehicleStatus.ACTIVE, search=search, is_for_sale=is_for_sale)
-    top_favorites = get_favorites(db, current_user.id)[:2] if current_user else []
+    favorites = get_favorites(db, current_user.id) if current_user else []
     return templates.TemplateResponse(
         name="vehicles/catalog.html",
         request=request,
@@ -59,7 +59,7 @@ def catalog(
             search=search,
             type_filter=type_filter,
             current_user=current_user,
-            top_favorites=top_favorites,
+            favorites=favorites,
         ),
     )
 

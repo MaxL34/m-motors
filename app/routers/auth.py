@@ -166,7 +166,7 @@ async def login(
         )
 
     token = create_access_token({"sub": str(user.id), "is_admin": False})
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse("/vehicles", status_code=303)
     response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
     return response
 
