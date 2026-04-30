@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
+from app.services.favorite_service import get_favorites, is_favorite
 from app.services.vehicle_service import get_vehicle, get_vehicles
 from app.utils.deps import get_current_user
 
@@ -49,10 +50,11 @@ def catalog(
         is_for_sale = False
 
     vehicles = get_vehicles(db, status=VehicleStatus.ACTIVE, search=search, is_for_sale=is_for_sale)
+    favorites = get_favorites(db, current_user.id) if current_user else []
     return templates.TemplateResponse(
         name="vehicles/catalog.html",
         request=request,
-        context=_ctx(vehicles=vehicles, search=search, type_filter=type_filter, current_user=current_user),
+        context=_ctx(vehicles=vehicles, search=search, type_filter=type_filter, current_user=current_user, favorites=favorites),
     )
 
 
@@ -64,8 +66,9 @@ def vehicle_detail(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     vehicle = get_vehicle(db, vehicle_id)
+    favorited = is_favorite(db, current_user.id, vehicle_id) if current_user else False
     return templates.TemplateResponse(
         name="vehicles/detail.html",
         request=request,
-        context=_ctx(vehicle=vehicle, current_user=current_user),
+        context=_ctx(vehicle=vehicle, current_user=current_user, is_favorite=favorited),
     )
