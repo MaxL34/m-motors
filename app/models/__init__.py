@@ -7,6 +7,7 @@ from app.models.client_file import ClientFile, ClientFileStatus, ClientFileType
 from app.models.document import Document, DocumentType
 from app.models.favorite import Favorite
 from app.models.otp_code import OtpCode
+from app.models.favorite import Favorite
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "DocumentType",
     "Favorite",
     "OtpCode",
+    "Favorite",
 ]

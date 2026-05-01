@@ -54,5 +54,5 @@ def toggle(
     current_user: User = Depends(require_user),
 ):
     toggle_favorite(db, current_user.id, vehicle_id)
-    referer = request.headers.get("referer", f"/vehicles/{vehicle_id}")
+    referer = request.headers.get("referer", "/vehicles")
     return RedirectResponse(referer, status_code=303)

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -8,10 +9,22 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.user import User
 from app.schemas.user_schema import UserCreate
-from app.services.auth_service import authenticate_user, create_user_with_hash, get_user_by_email
+from app.services.auth_service import (
+    authenticate_user,
+    create_user_with_hash,
+    get_user_by_email,
+    unlock_user,
+)
 from app.services.email_service import send_confirmation_email
-from app.services.otp_service import create_registration_otp, send_otp_sms, verify_registration_otp
+from app.services.otp_service import (
+    create_registration_otp,
+    create_unlock_otp,
+    send_otp_sms,
+    verify_registration_otp,
+    verify_unlock_otp,
+)
 from app.utils.security import create_access_token, hash_password
 
 router = APIRouter(tags=["auth"])
@@ -19,6 +32,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 COOKIE_NAME = "access_token"
 PENDING_COOKIE_NAME = "pending_otp_token"
+UNLOCK_COOKIE_NAME = "unlock_otp_token"
 
 
 # ── Inscription ───────────────────────────────────────────────────────────────
@@ -149,7 +163,35 @@ async def login(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    user = authenticate_user(db, email, password)
+    user, error = authenticate_user(db, email, password)
+    if error == "unlock_ready":
+        otp = create_unlock_otp(db, user.id)
+        try:
+            send_otp_sms(user.phone_number, otp.code)
+        except Exception as exc:
+            logger.error(f"OTP SMS send failed during unlock: {exc}")
+        response = RedirectResponse("/login/unlock", status_code=303)
+        response.set_cookie(
+            UNLOCK_COOKIE_NAME, otp.pending_token,
+            httponly=True, samesite="lax", max_age=600,
+        )
+        return response
+    if error == "locked":
+        remaining_minutes = 10
+        if user and user.locked_at:
+            locked_at = user.locked_at.replace(tzinfo=timezone.utc) if user.locked_at.tzinfo is None else user.locked_at
+            elapsed = datetime.now(timezone.utc) - locked_at
+            remaining = timedelta(minutes=10) - elapsed
+            remaining_minutes = max(1, int(remaining.total_seconds() / 60) + 1)
+        return templates.TemplateResponse(
+            name="auth/login.html",
+            request=request,
+            context={
+                "error": f"Votre compte est temporairement bloqué. Réessayez dans {remaining_minutes} minute(s).",
+                "form_email": email,
+            },
+            status_code=403,
+        )
     if not user:
         return templates.TemplateResponse(
             name="auth/login.html",
@@ -171,6 +213,54 @@ async def login(
     return response
 
 
+# ── Déverrouillage par OTP ────────────────────────────────────────────────────
+
+@router.get("/login/unlock", response_class=HTMLResponse)
+async def get_unlock(request: Request):
+    if not request.cookies.get(UNLOCK_COOKIE_NAME):
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(name="auth/unlock_otp.html", request=request)
+
+
+@router.post("/login/unlock", response_class=HTMLResponse)
+async def post_unlock(
+    request: Request,
+    db: Session = Depends(get_db),
+    code: str = Form(...),
+):
+    pending_token = request.cookies.get(UNLOCK_COOKIE_NAME)
+    if not pending_token:
+        return RedirectResponse("/login", status_code=303)
+
+    success, error_msg, user_id = verify_unlock_otp(db, pending_token, code)
+
+    if not success:
+        if "restante(s)" not in error_msg:
+            response = RedirectResponse("/login", status_code=303)
+            response.delete_cookie(UNLOCK_COOKIE_NAME)
+            return response
+        return templates.TemplateResponse(
+            name="auth/unlock_otp.html",
+            request=request,
+            context={"error": error_msg},
+            status_code=422,
+        )
+
+    user = db.get(User, user_id)
+    if not user:
+        response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie(UNLOCK_COOKIE_NAME)
+        return response
+
+    unlock_user(db, user)
+
+    token = create_access_token({"sub": str(user.id), "is_admin": False})
+    response = RedirectResponse("/", status_code=303)
+    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
+    response.delete_cookie(UNLOCK_COOKIE_NAME)
+    return response
+
+
 # ── Connexion admin ───────────────────────────────────────────────────────────
 
 @router.post("/admin/login", response_class=HTMLResponse)
@@ -180,7 +270,7 @@ async def admin_login(
     email: str = Form(...),
     password: str = Form(...),
 ):
-    user = authenticate_user(db, email, password)
+    user, error = authenticate_user(db, email, password)
     if not user or not user.is_admin:
         return templates.TemplateResponse(
             name="auth/admin_login.html",

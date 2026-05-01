@@ -320,12 +320,12 @@ class TestLogin:
         assert response.status_code == 303
         assert "access_token" in response.cookies
 
-    def test_login_redirects_to_homepage(self, client, db):
+    def test_login_redirects_to_catalog(self, client, db):
         make_user(db, email="user2@example.com", password="goodpass")
         response = client.post("/login", data={
             "email": "user2@example.com", "password": "goodpass",
         }, follow_redirects=False)
-        assert response.headers["location"] == "/"
+        assert response.headers["location"] == "/vehicles"
 
     def test_login_wrong_password_returns_401(self, client, db):
         make_user(db, email="user3@example.com", password="correctpass")
@@ -375,6 +375,48 @@ class TestLogin:
         }, follow_redirects=False)
         assert response.status_code == 303
         assert "access_token" in response.cookies
+
+    def test_login_increments_failed_attempts_on_wrong_password(self, client, db):
+        user = make_user(db, email="user6@example.com", password="correctpass")
+        client.post("/login", data={"email": "user6@example.com", "password": "wrong"})
+        db.expire_all()
+        assert user.failed_login_attempts == 1
+
+    def test_login_resets_attempts_on_success(self, client, db):
+        user = make_user(db, email="user7@example.com", password="correctpass")
+        user.failed_login_attempts = 2
+        db.commit()
+        client.post("/login", data={"email": "user7@example.com", "password": "correctpass"})
+        db.expire_all()
+        assert user.failed_login_attempts == 0
+
+    def test_login_locks_account_after_max_attempts(self, client, db):
+        user = make_user(db, email="user8@example.com", password="correctpass")
+        for _ in range(3):
+            client.post("/login", data={"email": "user8@example.com", "password": "wrong"})
+        db.expire_all()
+        assert user.is_locked is True
+
+    def test_login_locked_account_returns_403(self, client, db):
+        user = make_user(db, email="user9@example.com", password="correctpass")
+        user.is_locked = True
+        db.commit()
+        response = client.post("/login", data={"email": "user9@example.com", "password": "correctpass"})
+        assert response.status_code == 403
+
+    def test_login_locked_account_shows_message(self, client, db):
+        user = make_user(db, email="user10@example.com", password="correctpass")
+        user.is_locked = True
+        db.commit()
+        response = client.post("/login", data={"email": "user10@example.com", "password": "correctpass"})
+        assert "bloqué" in response.text
+
+    def test_login_locked_account_cannot_login_with_correct_password(self, client, db):
+        user = make_user(db, email="user11@example.com", password="correctpass")
+        user.is_locked = True
+        db.commit()
+        response = client.post("/login", data={"email": "user11@example.com", "password": "correctpass"}, follow_redirects=False)
+        assert "access_token" not in response.cookies
 
 
 # ── POST /admin/login ─────────────────────────────────────────────────────────
