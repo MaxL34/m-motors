@@ -320,12 +320,12 @@ class TestLogin:
         assert response.status_code == 303
         assert "access_token" in response.cookies
 
-    def test_login_redirects_to_homepage(self, client, db):
+    def test_login_redirects_to_catalog(self, client, db):
         make_user(db, email="user2@example.com", password="goodpass")
         response = client.post("/login", data={
             "email": "user2@example.com", "password": "goodpass",
         }, follow_redirects=False)
-        assert response.headers["location"] == "/"
+        assert response.headers["location"] == "/vehicles"
 
     def test_login_wrong_password_returns_401(self, client, db):
         make_user(db, email="user3@example.com", password="correctpass")
