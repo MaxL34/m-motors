@@ -395,8 +395,8 @@ def admin_customer_file_detail(
     file_id: int,
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
-    success: str = None,
-    error: str = None,
+    success: str | None = None,
+    error: str | None = None,
 ):
     client_file = get_client_file(db, file_id)
     docs_by_type = {d.document_type: d for d in client_file.documents}
