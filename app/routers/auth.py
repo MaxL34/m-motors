@@ -15,14 +15,18 @@ from app.services.auth_service import (
     authenticate_user,
     create_user_with_hash,
     get_user_by_email,
+    get_user_by_id,
+    reset_password,
     unlock_user,
 )
 from app.services.email_service import send_confirmation_email
 from app.services.otp_service import (
     create_registration_otp,
+    create_reset_otp,
     create_unlock_otp,
     send_otp_sms,
     verify_registration_otp,
+    verify_reset_otp,
     verify_unlock_otp,
 )
 from app.utils.security import create_access_token, hash_password
@@ -33,6 +37,8 @@ templates = Jinja2Templates(directory="app/templates")
 COOKIE_NAME = "access_token"
 PENDING_COOKIE_NAME = "pending_otp_token"
 UNLOCK_COOKIE_NAME = "unlock_otp_token"
+RESET_OTP_COOKIE = "reset_otp_token"
+RESET_ACCESS_COOKIE = "reset_access_token"
 
 
 # ── Inscription ───────────────────────────────────────────────────────────────
@@ -281,6 +287,160 @@ async def admin_login(
     token = create_access_token({"sub": str(user.id), "is_admin": True})
     response = RedirectResponse("/admin/vehicles", status_code=303)
     response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
+    return response
+
+
+# ── Mot de passe oublié ───────────────────────────────────────────────────────
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def get_forgot_password(request: Request):
+    return templates.TemplateResponse(name="auth/forgot_password.html", request=request, context={})
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+async def post_forgot_password(
+    request: Request,
+    db: Session = Depends(get_db),
+    email: str = Form(...),
+):
+    user = get_user_by_email(db, email)
+    if not user or not user.is_active:
+        return templates.TemplateResponse(
+            name="auth/forgot_password.html",
+            request=request,
+            context={"error": "Aucun compte actif n'est associé à cette adresse e-mail."},
+            status_code=404,
+        )
+    if not user.phone_number:
+        return templates.TemplateResponse(
+            name="auth/forgot_password.html",
+            request=request,
+            context={"error": "Aucun numéro de téléphone n'est associé à ce compte. Contactez le support."},
+            status_code=422,
+        )
+
+    otp = create_reset_otp(db, user.id)
+    try:
+        send_otp_sms(user.phone_number, otp.code)
+    except Exception as exc:
+        logger.error(f"OTP SMS send failed during password reset: {exc}")
+        return templates.TemplateResponse(
+            name="auth/forgot_password.html",
+            request=request,
+            context={"error": "Impossible d'envoyer le SMS de vérification. Réessayez."},
+            status_code=503,
+        )
+
+    response = RedirectResponse("/forgot-password/verify", status_code=303)
+    response.set_cookie(
+        RESET_OTP_COOKIE, otp.pending_token,
+        httponly=True, samesite="lax", max_age=600,
+    )
+    return response
+
+
+@router.get("/forgot-password/verify", response_class=HTMLResponse)
+async def get_reset_verify(request: Request):
+    if not request.cookies.get(RESET_OTP_COOKIE):
+        return RedirectResponse("/forgot-password", status_code=303)
+    return templates.TemplateResponse(name="auth/reset_otp.html", request=request, context={})
+
+
+@router.post("/forgot-password/verify", response_class=HTMLResponse)
+async def post_reset_verify(
+    request: Request,
+    db: Session = Depends(get_db),
+    code: str = Form(...),
+):
+    pending_token = request.cookies.get(RESET_OTP_COOKIE)
+    if not pending_token:
+        return RedirectResponse("/forgot-password", status_code=303)
+
+    success, error_msg, user_id = verify_reset_otp(db, pending_token, code)
+
+    if not success:
+        if "recommencer" in error_msg and "tentative" not in error_msg:
+            response = RedirectResponse("/forgot-password", status_code=303)
+            response.delete_cookie(RESET_OTP_COOKIE)
+            return response
+        return templates.TemplateResponse(
+            name="auth/reset_otp.html",
+            request=request,
+            context={"error": error_msg},
+            status_code=422,
+        )
+
+    reset_token = create_access_token(
+        {"sub": str(user_id), "purpose": "password_reset"},
+        expires_delta=timedelta(minutes=5),
+    )
+    response = RedirectResponse("/reset-password", status_code=303)
+    response.set_cookie(
+        RESET_ACCESS_COOKIE, reset_token,
+        httponly=True, samesite="lax", max_age=300,
+    )
+    response.delete_cookie(RESET_OTP_COOKIE)
+    return response
+
+
+@router.get("/reset-password", response_class=HTMLResponse)
+async def get_reset_password(request: Request):
+    from app.utils.security import decode_access_token
+    token = request.cookies.get(RESET_ACCESS_COOKIE)
+    if not token:
+        return RedirectResponse("/forgot-password", status_code=303)
+    payload = decode_access_token(token)
+    if not payload or payload.get("purpose") != "password_reset":
+        response = RedirectResponse("/forgot-password", status_code=303)
+        response.delete_cookie(RESET_ACCESS_COOKIE)
+        return response
+    return templates.TemplateResponse(name="auth/reset_password.html", request=request, context={})
+
+
+@router.post("/reset-password", response_class=HTMLResponse)
+async def post_reset_password(
+    request: Request,
+    db: Session = Depends(get_db),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    from app.utils.security import decode_access_token, hash_password
+    token = request.cookies.get(RESET_ACCESS_COOKIE)
+    if not token:
+        return RedirectResponse("/forgot-password", status_code=303)
+
+    payload = decode_access_token(token)
+    if not payload or payload.get("purpose") != "password_reset":
+        response = RedirectResponse("/forgot-password", status_code=303)
+        response.delete_cookie(RESET_ACCESS_COOKIE)
+        return response
+
+    errors = []
+    if len(new_password) < 8:
+        errors.append("Le mot de passe doit contenir au moins 8 caractères.")
+    if new_password != confirm_password:
+        errors.append("Les mots de passe ne correspondent pas.")
+    if errors:
+        return templates.TemplateResponse(
+            name="auth/reset_password.html",
+            request=request,
+            context={"errors": errors},
+            status_code=422,
+        )
+
+    user = get_user_by_id(db, int(payload["sub"]))
+    if not user or not user.is_active:
+        response = RedirectResponse("/forgot-password", status_code=303)
+        response.delete_cookie(RESET_ACCESS_COOKIE)
+        return response
+
+    reset_password(db, user, new_password)
+
+    response = RedirectResponse(
+        "/login?success=Mot+de+passe+réinitialisé.+Connectez-vous.",
+        status_code=303,
+    )
+    response.delete_cookie(RESET_ACCESS_COOKIE)
     return response
 
 

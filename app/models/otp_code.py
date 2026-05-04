@@ -20,6 +20,7 @@ class OtpCode(Base):
     pending_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    purpose: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
