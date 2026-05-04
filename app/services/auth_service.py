@@ -124,3 +124,12 @@ def unlock_user(db: Session, user: User) -> None:
     user.failed_login_attempts = 0
     user.locked_at = None
     db.commit()
+
+
+def get_user_by_id(db: Session, user_id: int) -> User | None:
+    return db.query(User).filter(User.id == user_id).first()
+
+
+def reset_password(db: Session, user: User, new_password: str) -> None:
+    user.password_hash = hash_password(new_password)
+    db.commit()

@@ -67,13 +67,15 @@ def verify_registration_otp(
 
 
 def create_unlock_otp(db: Session, user_id: int) -> OtpCode:
+    from sqlalchemy import or_
     db.query(OtpCode).filter(
         OtpCode.user_id == user_id,
         OtpCode.used.is_(False),
-        OtpCode.registration_json.is_(None),
+        or_(OtpCode.purpose == "unlock", OtpCode.purpose.is_(None)),
     ).delete(synchronize_session=False)
     otp = OtpCode(
         user_id=user_id,
+        purpose="unlock",
         code=_generate_code(),
         pending_token=uuid.uuid4().hex,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=_OTP_EXPIRY_MINUTES),
@@ -91,11 +93,12 @@ def verify_unlock_otp(
 
     Returns (success, error_message, user_id).
     """
+    from sqlalchemy import or_
     otp = (
         db.query(OtpCode)
         .filter(
             OtpCode.pending_token == pending_token,
-            OtpCode.registration_json.is_(None),
+            or_(OtpCode.purpose == "unlock", OtpCode.purpose.is_(None)),
         )
         .first()
     )
@@ -117,6 +120,64 @@ def verify_unlock_otp(
         if remaining > 0:
             return False, f"Code incorrect. {remaining} tentative(s) restante(s).", None
         return False, "Trop de tentatives. Veuillez vous reconnecter.", None
+
+    otp.used = True
+    db.commit()
+    return True, "", otp.user_id
+
+
+def create_reset_otp(db: Session, user_id: int) -> OtpCode:
+    db.query(OtpCode).filter(
+        OtpCode.user_id == user_id,
+        OtpCode.used.is_(False),
+        OtpCode.purpose == "reset",
+    ).delete(synchronize_session=False)
+    otp = OtpCode(
+        user_id=user_id,
+        purpose="reset",
+        code=_generate_code(),
+        pending_token=uuid.uuid4().hex,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=_OTP_EXPIRY_MINUTES),
+    )
+    db.add(otp)
+    db.commit()
+    db.refresh(otp)
+    return otp
+
+
+def verify_reset_otp(
+    db: Session, pending_token: str, code: str
+) -> tuple[bool, str, int | None]:
+    """Validate a submitted password-reset OTP code.
+
+    Returns (success, error_message, user_id).
+    """
+    otp = (
+        db.query(OtpCode)
+        .filter(
+            OtpCode.pending_token == pending_token,
+            OtpCode.purpose == "reset",
+        )
+        .first()
+    )
+
+    if not otp or otp.used:
+        return False, "Session invalide. Veuillez recommencer.", None
+
+    if datetime.now(timezone.utc) > otp.expires_at.replace(tzinfo=timezone.utc):
+        return False, "Le code a expiré. Veuillez recommencer.", None
+
+    if otp.attempts >= _MAX_ATTEMPTS:
+        return False, "Trop de tentatives. Veuillez recommencer.", None
+
+    otp.attempts += 1
+
+    if otp.code != code.strip():
+        db.commit()
+        remaining = _MAX_ATTEMPTS - otp.attempts
+        if remaining > 0:
+            return False, f"Code incorrect. {remaining} tentative(s) restante(s).", None
+        return False, "Trop de tentatives. Veuillez recommencer.", None
 
     otp.used = True
     db.commit()
