@@ -1,3 +1,4 @@
+"""Authentication router — registration, login, OTP flows, password reset."""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -34,14 +35,15 @@ from app.utils.security import create_access_token, hash_password
 router = APIRouter(tags=["auth"])
 templates = Jinja2Templates(directory="app/templates")
 
+# Cookie names — centralised here to avoid magic strings across handlers.
 COOKIE_NAME = "access_token"
-PENDING_COOKIE_NAME = "pending_otp_token"
-UNLOCK_COOKIE_NAME = "unlock_otp_token"
-RESET_OTP_COOKIE = "reset_otp_token"
-RESET_ACCESS_COOKIE = "reset_access_token"
+PENDING_COOKIE_NAME = "pending_otp_token"   # registration OTP session
+UNLOCK_COOKIE_NAME = "unlock_otp_token"     # account-unlock OTP session
+RESET_OTP_COOKIE = "reset_otp_token"        # password-reset OTP session
+RESET_ACCESS_COOKIE = "reset_access_token"  # short-lived JWT after OTP verified
 
 
-# ── Inscription ───────────────────────────────────────────────────────────────
+# ── Registration ──────────────────────────────────────────────────────────────
 
 @router.post("/register", response_class=HTMLResponse)
 async def register(
@@ -54,6 +56,11 @@ async def register(
     phone_number: str = Form(...),
     address: Optional[str] = Form(None),
 ):
+    """Validate the registration form, create an OTP and redirect to verify.
+
+    The user row is NOT created yet — it is held in the OTP payload until
+    the SMS code is confirmed.
+    """
     form_data = {
         "first_name": first_name, "last_name": last_name,
         "email": email, "phone_number": phone_number, "address": address,
@@ -81,6 +88,7 @@ async def register(
             status_code=422,
         )
 
+    # Hash the password now so it is never stored in plain text, even temporarily.
     registration_data = {
         "first_name": data.first_name,
         "last_name": data.last_name,
@@ -108,10 +116,11 @@ async def register(
     return response
 
 
-# ── Vérification OTP (inscription) ───────────────────────────────────────────
+# ── Registration OTP verification ─────────────────────────────────────────────
 
 @router.get("/register/verify", response_class=HTMLResponse)
 async def get_verify_registration(request: Request):
+    """Show the OTP form. Redirect to /register if the session cookie is missing."""
     if not request.cookies.get(PENDING_COOKIE_NAME):
         return RedirectResponse("/register", status_code=303)
     return templates.TemplateResponse(name="auth/verify_otp.html", request=request)
@@ -123,6 +132,7 @@ async def post_verify_registration(
     db: Session = Depends(get_db),
     code: str = Form(...),
 ):
+    """Verify the registration OTP and create the user account on success."""
     pending_token = request.cookies.get(PENDING_COOKIE_NAME)
     if not pending_token:
         return RedirectResponse("/register", status_code=303)
@@ -130,6 +140,7 @@ async def post_verify_registration(
     success, error_msg, registration_data = verify_registration_otp(db, pending_token, code)
 
     if not success:
+        # "recommencer" signals a terminal error (expired / exhausted) — restart the flow.
         if "recommencer" in error_msg:
             response = RedirectResponse(
                 f"/register?error={error_msg.replace(' ', '+')}",
@@ -160,7 +171,7 @@ async def post_verify_registration(
     return response
 
 
-# ── Connexion utilisateur ─────────────────────────────────────────────────────
+# ── Login ─────────────────────────────────────────────────────────────────────
 
 @router.post("/login", response_class=HTMLResponse)
 async def login(
@@ -169,6 +180,13 @@ async def login(
     email: str = Form(...),
     password: str = Form(...),
 ):
+    """Authenticate a regular user and issue a session cookie.
+
+    Handles three special cases before issuing the token:
+    - locked + window elapsed → redirect to OTP unlock flow
+    - locked + window not elapsed → show wait message
+    - admin trying the user route → redirect to admin login
+    """
     user, error = authenticate_user(db, email, password)
     if error == "unlock_ready":
         otp = create_unlock_otp(db, user.id)
@@ -219,10 +237,11 @@ async def login(
     return response
 
 
-# ── Déverrouillage par OTP ────────────────────────────────────────────────────
+# ── Account unlock via OTP ────────────────────────────────────────────────────
 
 @router.get("/login/unlock", response_class=HTMLResponse)
 async def get_unlock(request: Request):
+    """Show the unlock OTP form. Redirect to /login if the session cookie is missing."""
     if not request.cookies.get(UNLOCK_COOKIE_NAME):
         return RedirectResponse("/login", status_code=303)
     return templates.TemplateResponse(name="auth/unlock_otp.html", request=request)
@@ -234,6 +253,7 @@ async def post_unlock(
     db: Session = Depends(get_db),
     code: str = Form(...),
 ):
+    """Verify the unlock OTP and log the user in directly on success."""
     pending_token = request.cookies.get(UNLOCK_COOKIE_NAME)
     if not pending_token:
         return RedirectResponse("/login", status_code=303)
@@ -241,6 +261,7 @@ async def post_unlock(
     success, error_msg, user_id = verify_unlock_otp(db, pending_token, code)
 
     if not success:
+        # Errors without "restante(s)" are terminal — restart from login.
         if "restante(s)" not in error_msg:
             response = RedirectResponse("/login", status_code=303)
             response.delete_cookie(UNLOCK_COOKIE_NAME)
@@ -267,7 +288,7 @@ async def post_unlock(
     return response
 
 
-# ── Connexion admin ───────────────────────────────────────────────────────────
+# ── Admin login ───────────────────────────────────────────────────────────────
 
 @router.post("/admin/login", response_class=HTMLResponse)
 async def admin_login(
@@ -276,6 +297,7 @@ async def admin_login(
     email: str = Form(...),
     password: str = Form(...),
 ):
+    """Authenticate an admin user. Rejects non-admin credentials."""
     user, error = authenticate_user(db, email, password)
     if not user or not user.is_admin:
         return templates.TemplateResponse(
@@ -290,10 +312,11 @@ async def admin_login(
     return response
 
 
-# ── Mot de passe oublié ───────────────────────────────────────────────────────
+# ── Password reset ────────────────────────────────────────────────────────────
 
 @router.get("/forgot-password", response_class=HTMLResponse)
 async def get_forgot_password(request: Request):
+    """Show the forgot-password email form."""
     return templates.TemplateResponse(name="auth/forgot_password.html", request=request, context={})
 
 
@@ -303,6 +326,11 @@ async def post_forgot_password(
     db: Session = Depends(get_db),
     email: str = Form(...),
 ):
+    """Look up the account, send a reset OTP by SMS, and redirect to verification.
+
+    Returns 404 for unknown / inactive emails and 422 when the account has
+    no phone number on file (OTP cannot be delivered).
+    """
     user = get_user_by_email(db, email)
     if not user or not user.is_active:
         return templates.TemplateResponse(
@@ -341,6 +369,7 @@ async def post_forgot_password(
 
 @router.get("/forgot-password/verify", response_class=HTMLResponse)
 async def get_reset_verify(request: Request):
+    """Show the reset OTP form. Redirect if the session cookie is missing."""
     if not request.cookies.get(RESET_OTP_COOKIE):
         return RedirectResponse("/forgot-password", status_code=303)
     return templates.TemplateResponse(name="auth/reset_otp.html", request=request, context={})
@@ -352,6 +381,12 @@ async def post_reset_verify(
     db: Session = Depends(get_db),
     code: str = Form(...),
 ):
+    """Verify the reset OTP and issue a short-lived reset_access_token on success.
+
+    The reset_access_token is a JWT (5 min TTL) carrying the user id and a
+    purpose claim. It gates the final password-change step without relying on
+    additional server-side state.
+    """
     pending_token = request.cookies.get(RESET_OTP_COOKIE)
     if not pending_token:
         return RedirectResponse("/forgot-password", status_code=303)
@@ -359,6 +394,7 @@ async def post_reset_verify(
     success, error_msg, user_id = verify_reset_otp(db, pending_token, code)
 
     if not success:
+        # Errors without "restante" are terminal — restart the reset flow.
         if "restante" not in error_msg:
             response = RedirectResponse("/forgot-password", status_code=303)
             response.delete_cookie(RESET_OTP_COOKIE)
@@ -385,6 +421,7 @@ async def post_reset_verify(
 
 @router.get("/reset-password", response_class=HTMLResponse)
 async def get_reset_password(request: Request):
+    """Show the new-password form, guarded by the reset_access_token cookie."""
     from app.utils.security import decode_access_token
     token = request.cookies.get(RESET_ACCESS_COOKIE)
     if not token:
@@ -404,6 +441,7 @@ async def post_reset_password(
     new_password: str = Form(...),
     confirm_password: str = Form(...),
 ):
+    """Apply the new password after validating the reset_access_token and inputs."""
     from app.utils.security import decode_access_token, hash_password
     token = request.cookies.get(RESET_ACCESS_COOKIE)
     if not token:
@@ -444,10 +482,11 @@ async def post_reset_password(
     return response
 
 
-# ── Déconnexion ───────────────────────────────────────────────────────────────
+# ── Logout ────────────────────────────────────────────────────────────────────
 
 @router.get("/logout")
 def logout():
+    """Clear the session cookie and redirect to the homepage."""
     response = RedirectResponse("/", status_code=303)
     response.delete_cookie(COOKIE_NAME)
     return response
