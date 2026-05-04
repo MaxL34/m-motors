@@ -14,10 +14,19 @@ _MAX_ATTEMPTS = 3
 
 
 def _generate_code() -> str:
+    """Return a zero-padded random 6-digit string."""
     return f"{random.randint(0, 999999):06d}"
 
 
+# ── Registration ──────────────────────────────────────────────────────────────
+
 def create_registration_otp(db: Session, registration_data: dict) -> OtpCode:
+    """Create an OTP for the registration flow.
+
+    The full registration payload is serialised into registration_json so the
+    user row can be created after the code is verified, without keeping any
+    server-side session state.
+    """
     otp = OtpCode(
         registration_json=json.dumps(registration_data),
         code=_generate_code(),
@@ -30,16 +39,14 @@ def create_registration_otp(db: Session, registration_data: dict) -> OtpCode:
     return otp
 
 
-def send_otp_sms(phone_number: str, code: str) -> None:
-    logger.warning(f"[DEV] OTP for {phone_number}: {code}")
-
-
 def verify_registration_otp(
     db: Session, pending_token: str, code: str
 ) -> tuple[bool, str, dict | None]:
     """Validate a submitted registration OTP code.
 
     Returns (success, error_message, registration_data).
+    registration_data is populated only on success; it contains the full
+    payload needed to create the user row.
     """
     otp = db.query(OtpCode).filter(OtpCode.pending_token == pending_token).first()
 
@@ -66,7 +73,26 @@ def verify_registration_otp(
     return True, "", json.loads(otp.registration_json)
 
 
+# ── SMS delivery ──────────────────────────────────────────────────────────────
+
+def send_otp_sms(phone_number: str, code: str) -> None:
+    """Send the OTP code by SMS.
+
+    Currently a development stub — replace with a real SMS provider
+    (e.g. Twilio, OVH SMS) before going to production.
+    """
+    logger.warning(f"[DEV] OTP for {phone_number}: {code}")
+
+
+# ── Account unlock ────────────────────────────────────────────────────────────
+
 def create_unlock_otp(db: Session, user_id: int) -> OtpCode:
+    """Create an OTP for the account-unlock flow.
+
+    Any existing unused unlock OTP for the same user is deleted first so
+    only one active unlock code exists at a time. NULL-purpose rows are
+    treated as legacy unlock OTPs for backward compatibility.
+    """
     from sqlalchemy import or_
     db.query(OtpCode).filter(
         OtpCode.user_id == user_id,
@@ -92,6 +118,7 @@ def verify_unlock_otp(
     """Validate a submitted unlock OTP code.
 
     Returns (success, error_message, user_id).
+    user_id is populated only on success.
     """
     from sqlalchemy import or_
     otp = (
@@ -126,7 +153,13 @@ def verify_unlock_otp(
     return True, "", otp.user_id
 
 
+# ── Password reset ────────────────────────────────────────────────────────────
+
 def create_reset_otp(db: Session, user_id: int) -> OtpCode:
+    """Create an OTP for the password-reset flow.
+
+    Any existing unused reset OTP for the same user is deleted first.
+    """
     db.query(OtpCode).filter(
         OtpCode.user_id == user_id,
         OtpCode.used.is_(False),
@@ -151,6 +184,7 @@ def verify_reset_otp(
     """Validate a submitted password-reset OTP code.
 
     Returns (success, error_message, user_id).
+    user_id is populated only on success.
     """
     otp = (
         db.query(OtpCode)
