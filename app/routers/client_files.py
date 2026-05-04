@@ -103,6 +103,7 @@ def my_file_detail(
     current_user: User = Depends(require_user),
     success: str | None = None,
     error: str | None = None,
+    new: bool = False,
 ):
     client_file = get_client_file(db, file_id)
     if client_file.user_id != current_user.id:
@@ -119,6 +120,7 @@ def my_file_detail(
             docs_by_type=docs_by_type,
             success=success,
             error=error,
+            show_intro=new,
         ),
     )
 
@@ -150,8 +152,8 @@ def open_file(
     from fastapi import HTTPException as _HTTPException
     try:
         data = ClientFileCreate(vehicle_id=vehicle_id, file_type=ClientFileType(file_type))
-        get_or_create_client_file(db, current_user.id, data)
-        return RedirectResponse("/my-file?success=Dossier+ouvert+avec+succès", status_code=303)
+        client_file = get_or_create_client_file(db, current_user.id, data)
+        return RedirectResponse(f"/my-file/{client_file.id}?new=1", status_code=303)
     except _HTTPException as e:
         return RedirectResponse(f"/vehicles/{vehicle_id}?error={quote(e.detail)}", status_code=303)
 
