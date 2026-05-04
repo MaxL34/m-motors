@@ -1,3 +1,4 @@
+"""FastAPI dependency functions for authentication guards."""
 from typing import Optional
 
 from fastapi import Cookie, Depends, HTTPException, status
@@ -14,6 +15,11 @@ def get_current_user(
     db: Session = Depends(get_db),
     access_token: Optional[str] = Cookie(default=None),
 ) -> Optional[User]:
+    """Return the authenticated user or None — never raises.
+
+    Used on public pages that optionally personalise content when a user
+    is logged in (e.g. homepage, vehicle catalogue).
+    """
     if not access_token:
         return None
     payload = decode_access_token(access_token)
@@ -27,6 +33,12 @@ def require_user(
     db: Session = Depends(get_db),
     access_token: Optional[str] = Cookie(default=None),
 ) -> User:
+    """Return the authenticated non-admin user or redirect to /login.
+
+    Raises HTTP 303 instead of 401/403 so the browser follows the redirect
+    directly rather than showing a bare error page.
+    Admin tokens are explicitly rejected — admins must use require_admin.
+    """
     if not access_token:
         raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
     payload = decode_access_token(access_token)
@@ -42,6 +54,11 @@ def require_admin(
     db: Session = Depends(get_db),
     access_token: Optional[str] = Cookie(default=None),
 ) -> User:
+    """Return the authenticated admin user or redirect to /admin/login.
+
+    Checks both the is_admin JWT claim and the database flag to prevent
+    privilege escalation via a forged token payload.
+    """
     if not access_token:
         raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/admin/login"})
     payload = decode_access_token(access_token)
