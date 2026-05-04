@@ -75,8 +75,8 @@ def my_file_list(
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
-    success: str = None,
-    error: str = None,
+    success: str | None = None,
+    error: str | None = None,
 ):
     client_files = get_all_active_client_files_by_user(db, current_user.id)
     files_with_progress = [
@@ -101,8 +101,8 @@ def my_file_detail(
     file_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
-    success: str = None,
-    error: str = None,
+    success: str | None = None,
+    error: str | None = None,
 ):
     client_file = get_client_file(db, file_id)
     if client_file.user_id != current_user.id:
@@ -172,5 +172,5 @@ async def upload_doc(
         await upload_document(db, client_file.id, DocumentType(doc_type), file)
         return RedirectResponse(f"/my-file/{file_id}?success=Document+envoyé+avec+succès", status_code=303)
     except Exception as e:
-        detail = e.detail if hasattr(e, "detail") else str(e)
+        detail = getattr(e, "detail", None) or str(e)
         return RedirectResponse(f"/my-file/{file_id}?error={quote(str(detail))}", status_code=303)
