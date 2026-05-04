@@ -359,7 +359,7 @@ async def post_reset_verify(
     success, error_msg, user_id = verify_reset_otp(db, pending_token, code)
 
     if not success:
-        if "recommencer" in error_msg and "tentative" not in error_msg:
+        if "restante" not in error_msg:
             response = RedirectResponse("/forgot-password", status_code=303)
             response.delete_cookie(RESET_OTP_COOKIE)
             return response

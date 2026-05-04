@@ -5,8 +5,8 @@ import pytest
 
 from app.models.otp_code import OtpCode
 from app.models.user import User
-from app.services.otp_service import create_registration_otp, verify_registration_otp
-from app.utils.security import create_access_token, hash_password
+from app.services.otp_service import create_registration_otp, create_reset_otp, verify_registration_otp
+from app.utils.security import create_access_token, hash_password, verify_password
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -512,3 +512,259 @@ class TestAdminProtection:
         response = client.get("/admin/vehicles", follow_redirects=False)
         assert response.status_code == 303
         assert "/admin/login" in response.headers["location"]
+
+
+# ── Helpers reset mot de passe ────────────────────────────────────────────────
+
+def _make_reset_user(db, *, email="reset@example.com", phone_number="0611111111", locked=False):
+    user = User(
+        first_name="Paul", last_name="Reset", email=email,
+        phone_number=phone_number,
+        password_hash=hash_password("ancien_mdp"),
+        is_active=True, is_admin=False,
+        is_locked=locked,
+        failed_login_attempts=3 if locked else 0,
+        locked_at=datetime.now(timezone.utc) if locked else None,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def _start_reset(client, db, *, email="reset@example.com", phone_number="0611111111", locked=False):
+    """Crée un utilisateur, déclenche le reset. Retourne (user, pending_token, code)."""
+    user = _make_reset_user(db, email=email, phone_number=phone_number, locked=locked)
+    with patch("app.routers.auth.send_otp_sms"):
+        response = client.post("/forgot-password", data={"email": email}, follow_redirects=False)
+    pending_token = response.cookies.get("reset_otp_token")
+    otp = db.query(OtpCode).filter(OtpCode.pending_token == pending_token).first()
+    return user, pending_token, otp.code
+
+
+def _reset_access_token(user_id: int) -> str:
+    return create_access_token(
+        {"sub": str(user_id), "purpose": "password_reset"},
+        expires_delta=timedelta(minutes=5),
+    )
+
+
+# ── GET /forgot-password ──────────────────────────────────────────────────────
+
+class TestGetForgotPassword:
+
+    def test_returns_200(self, client):
+        response = client.get("/forgot-password")
+        assert response.status_code == 200
+
+    def test_shows_email_form(self, client):
+        response = client.get("/forgot-password")
+        assert "forgot-password" in response.text
+
+
+# ── POST /forgot-password ─────────────────────────────────────────────────────
+
+class TestPostForgotPassword:
+
+    def test_unknown_email_returns_404(self, client):
+        with patch("app.routers.auth.send_otp_sms"):
+            response = client.post("/forgot-password", data={"email": "inconnu@example.com"})
+        assert response.status_code == 404
+
+    def test_unknown_email_shows_error(self, client):
+        with patch("app.routers.auth.send_otp_sms"):
+            response = client.post("/forgot-password", data={"email": "inconnu@example.com"})
+        assert "aucun compte" in response.text.lower()
+
+    def test_user_without_phone_returns_422(self, client, db):
+        make_user(db, email="nophone@example.com", phone_number=None)
+        response = client.post("/forgot-password", data={"email": "nophone@example.com"})
+        assert response.status_code == 422
+
+    def test_valid_email_redirects_to_verify(self, client, db):
+        _, pending_token, _ = _start_reset(client, db)
+        assert pending_token is not None
+
+    def test_valid_email_sets_reset_otp_cookie(self, client, db):
+        make_user(db, email="reset@example.com", phone_number="0611111111")
+        with patch("app.routers.auth.send_otp_sms"):
+            response = client.post("/forgot-password", data={"email": "reset@example.com"}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "reset_otp_token" in response.cookies
+
+    def test_valid_email_creates_reset_otp_in_db(self, client, db):
+        make_user(db, email="reset@example.com", phone_number="0611111111")
+        with patch("app.routers.auth.send_otp_sms"):
+            client.post("/forgot-password", data={"email": "reset@example.com"})
+        otp = db.query(OtpCode).filter(OtpCode.purpose == "reset").first()
+        assert otp is not None
+
+    def test_valid_email_calls_send_otp_sms(self, client, db):
+        make_user(db, email="reset@example.com", phone_number="0611111111")
+        with patch("app.routers.auth.send_otp_sms") as mock_sms:
+            client.post("/forgot-password", data={"email": "reset@example.com"})
+        mock_sms.assert_called_once()
+
+
+# ── GET /forgot-password/verify ───────────────────────────────────────────────
+
+class TestGetForgotPasswordVerify:
+
+    def test_without_cookie_redirects_to_forgot_password(self, client):
+        response = client.get("/forgot-password/verify", follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
+
+    def test_with_cookie_returns_200(self, client, db):
+        _, pending_token, _ = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.get("/forgot-password/verify")
+        assert response.status_code == 200
+
+
+# ── POST /forgot-password/verify ─────────────────────────────────────────────
+
+class TestPostForgotPasswordVerify:
+
+    def test_without_cookie_redirects_to_forgot_password(self, client):
+        response = client.post("/forgot-password/verify", data={"code": "123456"}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
+
+    def test_valid_code_redirects_to_reset_password(self, client, db):
+        _, pending_token, code = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.post("/forgot-password/verify", data={"code": code}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/reset-password" in response.headers["location"]
+
+    def test_valid_code_sets_reset_access_token(self, client, db):
+        _, pending_token, code = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.post("/forgot-password/verify", data={"code": code}, follow_redirects=False)
+        assert "reset_access_token" in response.cookies
+
+    def test_valid_code_clears_otp_cookie(self, client, db):
+        _, pending_token, code = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.post("/forgot-password/verify", data={"code": code}, follow_redirects=False)
+        assert response.cookies.get("reset_otp_token") == "" or "reset_otp_token" not in response.cookies
+
+    def test_valid_code_marks_otp_as_used(self, client, db):
+        _, pending_token, code = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        client.post("/forgot-password/verify", data={"code": code})
+        db.expire_all()
+        otp = db.query(OtpCode).filter(OtpCode.pending_token == pending_token).first()
+        assert otp.used is True
+
+    def test_wrong_code_returns_422(self, client, db):
+        _, pending_token, _ = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.post("/forgot-password/verify", data={"code": "000000"})
+        assert response.status_code == 422
+
+    def test_wrong_code_shows_remaining_attempts(self, client, db):
+        _, pending_token, _ = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.post("/forgot-password/verify", data={"code": "000000"})
+        assert "tentative" in response.text
+
+    def test_expired_otp_redirects(self, client, db):
+        user, pending_token, _ = _start_reset(client, db)
+        otp = db.query(OtpCode).filter(OtpCode.pending_token == pending_token).first()
+        otp.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+        client.cookies.set("reset_otp_token", pending_token)
+        response = client.post("/forgot-password/verify", data={"code": otp.code}, follow_redirects=False)
+        assert response.status_code == 303
+
+    def test_max_attempts_redirects(self, client, db):
+        _, pending_token, _ = _start_reset(client, db)
+        client.cookies.set("reset_otp_token", pending_token)
+        for _ in range(3):
+            response = client.post("/forgot-password/verify", data={"code": "000000"}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
+
+
+# ── GET /reset-password ───────────────────────────────────────────────────────
+
+class TestGetResetPassword:
+
+    def test_without_cookie_redirects_to_forgot_password(self, client):
+        response = client.get("/reset-password", follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
+
+    def test_with_invalid_token_redirects(self, client):
+        client.cookies.set("reset_access_token", "token.invalide.xxx")
+        response = client.get("/reset-password", follow_redirects=False)
+        assert response.status_code == 303
+
+    def test_with_valid_token_returns_200(self, client, db):
+        user = _make_reset_user(db)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        response = client.get("/reset-password")
+        assert response.status_code == 200
+
+
+# ── POST /reset-password ──────────────────────────────────────────────────────
+
+class TestPostResetPassword:
+
+    def test_without_cookie_redirects(self, client):
+        response = client.post("/reset-password",
+                               data={"new_password": "nouveau123", "confirm_password": "nouveau123"},
+                               follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
+
+    def test_password_too_short_returns_422(self, client, db):
+        user = _make_reset_user(db)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        response = client.post("/reset-password",
+                               data={"new_password": "court", "confirm_password": "court"})
+        assert response.status_code == 422
+
+    def test_passwords_dont_match_returns_422(self, client, db):
+        user = _make_reset_user(db)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        response = client.post("/reset-password",
+                               data={"new_password": "nouveau123", "confirm_password": "different123"})
+        assert response.status_code == 422
+
+    def test_valid_reset_updates_password(self, client, db):
+        user = _make_reset_user(db)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        client.post("/reset-password",
+                    data={"new_password": "nouveau_mdp", "confirm_password": "nouveau_mdp"})
+        db.expire_all()
+        assert verify_password("nouveau_mdp", user.password_hash)
+
+    def test_valid_reset_redirects_to_login(self, client, db):
+        user = _make_reset_user(db)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        response = client.post("/reset-password",
+                               data={"new_password": "nouveau_mdp", "confirm_password": "nouveau_mdp"},
+                               follow_redirects=False)
+        assert response.status_code == 303
+        assert "/login" in response.headers["location"]
+
+    def test_valid_reset_clears_reset_cookie(self, client, db):
+        user = _make_reset_user(db)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        response = client.post("/reset-password",
+                               data={"new_password": "nouveau_mdp", "confirm_password": "nouveau_mdp"},
+                               follow_redirects=False)
+        assert response.cookies.get("reset_access_token") == "" or "reset_access_token" not in response.cookies
+
+    def test_valid_reset_unlocks_locked_account(self, client, db):
+        user = _make_reset_user(db, locked=True)
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        client.post("/reset-password",
+                    data={"new_password": "nouveau_mdp", "confirm_password": "nouveau_mdp"})
+        db.expire_all()
+        assert user.is_locked is False
+        assert user.failed_login_attempts == 0
+        assert user.locked_at is None
