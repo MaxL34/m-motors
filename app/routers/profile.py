@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Form, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user_schema import PasswordChange, UserUpdate
-from app.services.auth_service import change_password, update_user
+from app.services.auth_service import change_password, delete_user, update_user
 from app.utils.deps import require_user
 
 router = APIRouter(tags=["profile"])
@@ -88,3 +88,15 @@ async def profile_password(
         context={"current_user": current_user, "success": None, "errors": [], "pwd_errors": pwd_errors, "pwd_success": None},
         status_code=422,
     )
+
+
+@router.post("/profile/delete", response_class=HTMLResponse)
+async def profile_delete(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    delete_user(db, current_user)
+    response = RedirectResponse("/?account_deleted=1", status_code=303)
+    response.delete_cookie("access_token")
+    return response
