@@ -40,6 +40,13 @@ def update_user(db: Session, user: User, data: UserUpdate) -> User:
             status_code=status.HTTP_409_CONFLICT,
             detail="Cette adresse e-mail est déjà utilisée",
         )
+    if data.phone_number and data.phone_number != user.phone_number:
+        existing = db.query(User).filter(User.phone_number == data.phone_number).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ce numéro de téléphone est déjà utilisé",
+            )
     user.first_name = data.first_name
     user.last_name = data.last_name
     user.email = data.email
