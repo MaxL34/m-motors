@@ -1,3 +1,4 @@
+"""Profile router — personal information, password change, account deletion."""
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -16,6 +17,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 @router.get("/profile", response_class=HTMLResponse)
 def profile_page(request: Request, current_user: User = Depends(require_user)):
+    """Render the profile page with empty error/success state."""
     return templates.TemplateResponse(
         name="profile/index.html",
         request=request,
@@ -34,6 +36,7 @@ async def profile_update(
     phone_number: str = Form(""),
     address: str = Form(""),
 ):
+    """Validate and apply profile changes. Re-render the form with errors on failure."""
     try:
         data = UserUpdate(
             first_name=first_name, last_name=last_name, email=email,
@@ -66,6 +69,7 @@ async def profile_password(
     new_password: str = Form(...),
     confirm_password: str = Form(...),
 ):
+    """Change the user's password after verifying the current one."""
     try:
         data = PasswordChange(
             current_password=current_password,
@@ -96,6 +100,7 @@ async def profile_delete(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_user),
 ):
+    """Soft-delete the account, clear the session cookie, and redirect home."""
     delete_user(db, current_user)
     response = RedirectResponse("/?account_deleted=1", status_code=303)
     response.delete_cookie("access_token")
