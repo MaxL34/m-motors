@@ -54,7 +54,13 @@ def catalog(
     return templates.TemplateResponse(
         name="vehicles/catalog.html",
         request=request,
-        context=_ctx(vehicles=vehicles, search=search, type_filter=type_filter, current_user=current_user, favorites=favorites),
+        context=_ctx(
+            vehicles=vehicles,
+            search=search,
+            type_filter=type_filter,
+            current_user=current_user,
+            favorites=favorites,
+        ),
     )
 
 
@@ -64,11 +70,12 @@ def vehicle_detail(
     vehicle_id: int,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
+    error: Optional[str] = None,
 ):
     vehicle = get_vehicle(db, vehicle_id)
-    favorited = is_favorite(db, current_user.id, vehicle_id) if current_user else False
+    fav = is_favorite(db, current_user.id, vehicle_id) if current_user else False
     return templates.TemplateResponse(
         name="vehicles/detail.html",
         request=request,
-        context=_ctx(vehicle=vehicle, current_user=current_user, is_favorite=favorited),
+        context=_ctx(vehicle=vehicle, current_user=current_user, is_favorite=fav, error=error),
     )

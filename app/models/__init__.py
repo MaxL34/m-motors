@@ -5,6 +5,7 @@ from app.models.user import User
 from app.models.vehicle import Vehicle, VehicleStatusHistory, StatusAction
 from app.models.client_file import ClientFile, ClientFileStatus, ClientFileType
 from app.models.document import Document, DocumentType
+from app.models.favorite import Favorite
 from app.models.otp_code import OtpCode
 from app.models.favorite import Favorite
 
@@ -19,6 +20,7 @@ __all__ = [
     "ClientFileType",
     "Document",
     "DocumentType",
+    "Favorite",
     "OtpCode",
     "Favorite",
 ]

@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}M-Motors{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+    <style>[x-cloak]{display:none!important}</style>
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col">
 
@@ -14,7 +16,8 @@
             <nav class="flex items-center gap-4 text-sm font-medium">
                 <a href="/vehicles" class="text-gray-600 hover:text-gray-900 transition-colors">Catalogue</a>
                 {% if current_user %}
-                <span class="text-gray-500">Bonjour {{ current_user.first_name }}</span>
+                <a href="/my-file" class="text-gray-600 hover:text-gray-900 transition-colors">Mon dossier</a>
+                <a href="/profile" class="text-gray-600 hover:text-gray-900 transition-colors">{{ current_user.first_name }}</a>
                 <a href="/logout" class="text-gray-600 hover:text-gray-900 transition-colors">Se déconnecter</a>
                 {% else %}
                 <a href="/register" class="text-gray-600 hover:text-gray-900 transition-colors">Créer un compte</a>

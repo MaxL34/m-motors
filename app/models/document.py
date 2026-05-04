@@ -1,54 +1,49 @@
+from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, Enum as SqlEnum, ForeignKey, UniqueConstraint, Text
+from typing import Optional
+
+from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
+
 from app.database import Base
 
 
 class DocumentType(str, Enum):
-    """Type of dicuments that can be attached to a client file"""
-    INVOICE = "INVOICE"
-    CONTRACT = "CONTRACT"
-    INSURANCE = "INSURANCE"
-    REGISTRATION = "REGISTRATION"
-    IDENTITY_PROOF = "IDENTITY_PROOF"
-    ADDRESS_PROOF = "ADDRESS_PROOF"
-    INSPECTION = "INSPECTION"
-    OTHER = "OTHER"
+    CNI = "CNI"
+    DRIVING_LICENSE = "DRIVING_LICENSE"
+    PROOF_OF_ADDRESS = "PROOF_OF_ADDRESS"
+    PAY_SLIP_1 = "PAY_SLIP_1"
+    PAY_SLIP_2 = "PAY_SLIP_2"
+    PAY_SLIP_3 = "PAY_SLIP_3"
+    TAX_NOTICE = "TAX_NOTICE"
+    RIB = "RIB"
+
+
+class DocumentStatus(str, Enum):
+    PENDING = "PENDING"       # à envoyer / en attente
+    PROCESSING = "PROCESSING" # en cours de traitement (verrouillé)
+    VALIDATED = "VALIDATED"   # validé
+    REFUSED = "REFUSED"       # refusé (à renvoyer)
+
 
 class Document(Base):
-    """SQLAlchemy model for a document in the application M-Motors.
-
-    Attributes:
-        id: Unique identifier
-        client_file_id: Foreign key to the associated client file
-        document_type: Type of the document (e.g., "ID_PROOF", "ADDRESS_PROOF", etc.)
-        file_name: Original name of the uploaded file
-        file_path: Path to the stored document file
-        file_size: Size of the file in bytes
-        mime_type: MIME type of the file (e.g., "application/pdf", "image/jpeg")
-        expiration_date: Optional expiration date for documents that have a validity period (e.g., insurance)
-        created_at: Creation timestamp
-        updated_at: Last modification update
-    """
-
     __tablename__ = "documents"
 
-    # Identifiers
-    id = Column(Integer, primary_key=True, index=True)
-    client_file_id = Column(Integer, ForeignKey("client_files.id"), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    client_file_id: Mapped[int] = mapped_column(ForeignKey("client_files.id"), nullable=False)
 
-    # Document details
-    document_type = Column(SqlEnum(DocumentType), nullable=False)
-    file_name = Column(String(255), nullable=False)
-    file_path = Column(String(255), nullable=False)
-    file_size = Column(Integer, nullable=False)
-    mime_type = Column(String(100), nullable=False)
-    expiration_date = Column(DateTime, nullable=True)
+    document_type: Mapped[DocumentType]
+    status: Mapped[DocumentStatus] = mapped_column(default=DocumentStatus.PENDING)
+    is_locked: Mapped[bool] = mapped_column(default=False)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Timestamps
-    created_at = Column(DateTime, server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255))
+    file_path: Mapped[str] = mapped_column(String(255))
+    file_size: Mapped[int]
+    mime_type: Mapped[str] = mapped_column(String(100))
 
-    # Relationships
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
     client_file = relationship("ClientFile", back_populates="documents")

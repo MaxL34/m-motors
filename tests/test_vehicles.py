@@ -1,6 +1,5 @@
 from typing import Optional
 
-import pytest
 from app.models.vehicle import FuelType, TransmissionType, Vehicle, VehicleStatus
 
 

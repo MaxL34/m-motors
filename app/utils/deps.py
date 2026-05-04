@@ -30,7 +30,7 @@ def require_user(
     if not access_token:
         raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
     payload = decode_access_token(access_token)
-    if not payload:
+    if not payload or payload.get("is_admin"):
         raise HTTPException(status_code=status.HTTP_303_SEE_OTHER, headers={"Location": "/login"})
     user = db.query(User).filter(User.id == int(payload["sub"])).first()
     if not user or user.is_active is False:
