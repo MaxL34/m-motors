@@ -46,4 +46,4 @@ class Document(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
-    client_file = relationship("ClientFile", back_populates="documents")
+    client_file: Mapped["ClientFile"] = relationship("ClientFile", back_populates="documents")

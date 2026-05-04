@@ -49,4 +49,4 @@ class ClientFile(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="client_files")
     vehicle: Mapped["Vehicle"] = relationship("Vehicle", back_populates="client_files")
-    documents: Mapped[list] = relationship("Document", back_populates="client_file")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="client_file")
