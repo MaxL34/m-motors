@@ -29,6 +29,7 @@ def create_registration_otp(db: Session, registration_data: dict) -> OtpCode:
     """
     otp = OtpCode(
         registration_json=json.dumps(registration_data),
+        purpose="registration",
         code=_generate_code(),
         pending_token=uuid.uuid4().hex,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=_OTP_EXPIRY_MINUTES),

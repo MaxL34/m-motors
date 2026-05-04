@@ -88,6 +88,14 @@ async def register(
             status_code=422,
         )
 
+    if db.query(User).filter(User.phone_number == data.phone_number).first():
+        return templates.TemplateResponse(
+            name="auth/register.html",
+            request=request,
+            context={"errors": ["Ce numéro de téléphone est déjà associé à un compte"], "form_data": form_data},
+            status_code=422,
+        )
+
     # Hash the password now so it is never stored in plain text, even temporarily.
     registration_data = {
         "first_name": data.first_name,
@@ -159,7 +167,12 @@ async def post_verify_registration(
         user = create_user_with_hash(db, registration_data)
         send_confirmation_email(user.email, user.first_name)
     except Exception as e:
-        response = RedirectResponse("/register", status_code=303)
+        logger.error(f"User creation failed after OTP verification: {e}", exc_info=True)
+        db.rollback()
+        response = RedirectResponse(
+            "/register?error=Une+erreur+est+survenue+lors+de+la+création+du+compte.+Veuillez+réessayer.",
+            status_code=303,
+        )
         response.delete_cookie(PENDING_COOKIE_NAME)
         return response
 
