@@ -106,22 +106,35 @@ def soft_delete_client_file(db: Session, file_id: int, admin_id: int) -> ClientF
 def get_trashed_client_files(db: Session) -> list[ClientFile]:
     return (
         db.query(ClientFile)
-        .filter(ClientFile.deleted_at.is_not(None))
+        .filter(ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
         .order_by(ClientFile.deleted_at.desc())
         .all()
     )
 
 
-def permanent_delete_client_file(db: Session, file_id: int) -> None:
+def get_deletion_history(db: Session) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.permanently_deleted_at.is_not(None))
+        .order_by(ClientFile.permanently_deleted_at.desc())
+        .all()
+    )
+
+
+def permanent_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
     client_file = (
         db.query(ClientFile)
-        .filter(ClientFile.id == file_id, ClientFile.deleted_at.is_not(None))
+        .filter(ClientFile.id == file_id, ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
         .first()
     )
     if not client_file:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable dans la corbeille")
-    db.delete(client_file)
+    client_file.permanently_deleted_at = datetime.now(timezone.utc)
+    client_file.permanently_deleted_by_admin_id = admin_id
+    client_file.permanently_deleted_reason = reason
     db.commit()
+    db.refresh(client_file)
+    return client_file
 
 
 def update_status(

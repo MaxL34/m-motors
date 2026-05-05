@@ -19,6 +19,7 @@ from app.services.client_file_service import (
     compute_progress,
     get_all_client_files,
     get_client_file,
+    get_deletion_history,
     get_trashed_client_files,
     permanent_delete_client_file,
     soft_delete_client_file,
@@ -506,12 +507,14 @@ def admin_trash(
     success: str = None,
 ):
     trashed = get_trashed_client_files(db)
+    history = get_deletion_history(db)
     return templates.TemplateResponse(
         name="admin/trash/list.html",
         request=request,
         context={
             "current_admin": current_admin,
             "trashed_files": trashed,
+            "deletion_history": history,
             "file_status_labels": FILE_STATUS_LABELS,
             "success": success,
         },
@@ -523,8 +526,9 @@ def admin_permanent_delete_client_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
+    deletion_reason: str = Form(...),
 ):
-    permanent_delete_client_file(db, file_id)
+    permanent_delete_client_file(db, file_id, current_admin.id, deletion_reason)
     return RedirectResponse(
         "/admin/trash?success=Dossier+supprimé+définitivement",
         status_code=303,
