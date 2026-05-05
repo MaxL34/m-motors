@@ -495,8 +495,9 @@ def admin_soft_delete_client_file(
     file_id: int,
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
+    deletion_reason: str = Form(...),
 ):
-    soft_delete_client_file(db, file_id, current_admin.id)
+    soft_delete_client_file(db, file_id, current_admin.id, deletion_reason)
     return RedirectResponse(
         "/admin/customer-files?success=Dossier+déplacé+dans+la+corbeille",
         status_code=303,
