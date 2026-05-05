@@ -19,6 +19,9 @@ from app.services.client_file_service import (
     compute_progress,
     get_all_client_files,
     get_client_file,
+    get_trashed_client_files,
+    permanent_delete_client_file,
+    soft_delete_client_file,
     update_status,
 )
 from app.services.document_service import (
@@ -476,4 +479,53 @@ def admin_view_document(
         path=str(file_path),
         media_type=doc.mime_type,
         filename=doc.file_name,
+    )
+
+
+# ── Trash ─────────────────────────────────────────────────────────────────────
+
+
+@router.post("/customer-files/{file_id}/delete")
+def admin_soft_delete_client_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    soft_delete_client_file(db, file_id, current_admin.id)
+    return RedirectResponse(
+        "/admin/customer-files?success=Dossier+déplacé+dans+la+corbeille",
+        status_code=303,
+    )
+
+
+@router.get("/trash", response_class=HTMLResponse)
+def admin_trash(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+    success: str = None,
+):
+    trashed = get_trashed_client_files(db)
+    return templates.TemplateResponse(
+        name="admin/trash/list.html",
+        request=request,
+        context={
+            "current_admin": current_admin,
+            "trashed_files": trashed,
+            "file_status_labels": FILE_STATUS_LABELS,
+            "success": success,
+        },
+    )
+
+
+@router.post("/trash/{file_id}/delete")
+def admin_permanent_delete_client_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    permanent_delete_client_file(db, file_id)
+    return RedirectResponse(
+        "/admin/trash?success=Dossier+supprimé+définitivement",
+        status_code=303,
     )
