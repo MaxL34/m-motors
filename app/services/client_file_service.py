@@ -28,6 +28,7 @@ def get_client_file_by_user(db: Session, user_id: int) -> ClientFile | None:
     return (
         db.query(ClientFile)
         .filter(ClientFile.user_id == user_id)
+        .filter(ClientFile.deleted_at.is_(None))
         .filter(ClientFile.status.notin_([ClientFileStatus.CANCELLED]))
         .order_by(ClientFile.created_at.desc())
         .first()
@@ -38,6 +39,7 @@ def get_all_active_client_files_by_user(db: Session, user_id: int) -> list[Clien
     return (
         db.query(ClientFile)
         .filter(ClientFile.user_id == user_id)
+        .filter(ClientFile.deleted_at.is_(None))
         .filter(ClientFile.status.notin_([ClientFileStatus.CANCELLED]))
         .order_by(ClientFile.created_at.desc())
         .all()
@@ -47,6 +49,7 @@ def get_all_active_client_files_by_user(db: Session, user_id: int) -> list[Clien
 def _count_active_files(db: Session, user_id: int) -> int:
     return db.query(ClientFile).filter(
         ClientFile.user_id == user_id,
+        ClientFile.deleted_at.is_(None),
         ClientFile.status.in_(ACTIVE_STATUSES),
     ).count()
 
@@ -55,6 +58,7 @@ def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate)
     existing = db.query(ClientFile).filter(
         ClientFile.user_id == user_id,
         ClientFile.vehicle_id == data.vehicle_id,
+        ClientFile.deleted_at.is_(None),
     ).first()
     if existing:
         if existing.status in (ClientFileStatus.CANCELLED, ClientFileStatus.REJECTED):
@@ -68,6 +72,7 @@ def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate)
             db.commit()
             db.refresh(existing)
         return existing
+
     if _count_active_files(db, user_id) >= MAX_ACTIVE_FILES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -94,13 +99,27 @@ def get_all_client_files(db: Session) -> list[ClientFile]:
     )
 
 
-def soft_delete_client_file(db: Session, file_id: int, admin_id: int) -> ClientFile:
+def soft_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
     client_file = get_client_file(db, file_id)
     client_file.deleted_at = datetime.now(timezone.utc)
     client_file.deleted_by_admin_id = admin_id
+    client_file.deleted_reason = reason
     db.commit()
     db.refresh(client_file)
     return client_file
+
+
+def get_closed_client_files_by_user(db: Session, user_id: int) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(
+            ClientFile.user_id == user_id,
+            ClientFile.deleted_at.is_not(None),
+            ClientFile.permanently_deleted_at.is_(None),
+        )
+        .order_by(ClientFile.deleted_at.desc())
+        .all()
+    )
 
 
 def get_trashed_client_files(db: Session) -> list[ClientFile]:
