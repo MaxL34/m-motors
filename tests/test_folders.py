@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -27,7 +28,11 @@ from app.services.document_service import (
     validate_document,
 )
 from app.services.favorite_service import get_favorites, is_favorite, toggle_favorite
-from app.utils.security import hash_password
+from app.utils.security import create_access_token, hash_password
+
+
+def user_cookie(user_id: int) -> str:
+    return create_access_token({"sub": str(user_id), "is_admin": False})
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -610,3 +615,135 @@ class TestGetFavorites:
         toggle_favorite(db, user1.id, vehicle.id)
 
         assert get_favorites(db, user2.id) == []
+
+
+# ── client_files router ───────────────────────────────────────────────────────
+
+
+class TestClientFilesRouter:
+
+    def test_my_file_list_requires_auth(self, client):
+        response = client.get("/my-file", follow_redirects=False)
+        assert response.status_code == 303
+
+    def test_my_file_list_returns_200(self, client, db):
+        user = make_user(db)
+        client.cookies.set("access_token", user_cookie(user.id))
+        response = client.get("/my-file")
+        assert response.status_code == 200
+
+    def test_my_file_list_shows_client_file(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        make_client_file(db, user.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(user.id))
+        response = client.get("/my-file")
+        assert "Peugeot" in response.text
+
+    def test_my_file_detail_requires_auth(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        response = client.get(f"/my-file/{cf.id}", follow_redirects=False)
+        assert response.status_code == 303
+
+    def test_my_file_detail_returns_200(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(user.id))
+        response = client.get(f"/my-file/{cf.id}")
+        assert response.status_code == 200
+
+    def test_my_file_detail_shows_intro_modal_with_new_param(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(user.id))
+        response = client.get(f"/my-file/{cf.id}?new=1")
+        assert "intro-modal" in response.text
+
+    def test_my_file_detail_wrong_user_redirects(self, client, db):
+        owner = make_user(db)
+        other = make_user(db, email="other@test.com")
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, owner.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(other.id))
+        response = client.get(f"/my-file/{cf.id}", follow_redirects=False)
+        assert response.status_code == 303
+        assert "/my-file" in response.headers["location"]
+
+    def test_my_file_status_returns_json(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(user.id))
+        response = client.get(f"/api/my-file/{cf.id}/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert data["status"] == "PENDING"
+
+    def test_my_file_status_wrong_user_returns_403(self, client, db):
+        owner = make_user(db)
+        other = make_user(db, email="other2@test.com")
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, owner.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(other.id))
+        response = client.get(f"/api/my-file/{cf.id}/status")
+        assert response.status_code == 403
+
+    def test_open_file_creates_and_redirects(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        client.cookies.set("access_token", user_cookie(user.id))
+        response = client.post("/my-file/open", data={
+            "vehicle_id": vehicle.id, "file_type": "SALE",
+        }, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/my-file/" in response.headers["location"]
+        assert "new=1" in response.headers["location"]
+
+    def test_upload_doc_success_redirects(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(user.id))
+        mock_doc = MagicMock()
+        mock_doc.client_file_id = cf.id
+        with patch("app.routers.client_files.upload_document", new=AsyncMock(return_value=mock_doc)):
+            response = client.post(
+                f"/my-file/{cf.id}/documents/CNI",
+                files={"file": ("test.pdf", b"%PDF-1.4", "application/pdf")},
+                follow_redirects=False,
+            )
+        assert response.status_code == 303
+        assert "success" in response.headers["location"]
+
+    def test_upload_doc_error_redirects_with_error(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(user.id))
+        with patch("app.routers.client_files.upload_document", new=AsyncMock(side_effect=Exception("Upload failed"))):
+            response = client.post(
+                f"/my-file/{cf.id}/documents/CNI",
+                files={"file": ("test.pdf", b"%PDF-1.4", "application/pdf")},
+                follow_redirects=False,
+            )
+        assert response.status_code == 303
+        assert "error" in response.headers["location"]
+
+    def test_upload_doc_wrong_user_redirects(self, client, db):
+        owner = make_user(db)
+        other = make_user(db, email="other3@test.com")
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, owner.id, vehicle.id)
+        client.cookies.set("access_token", user_cookie(other.id))
+        response = client.post(
+            f"/my-file/{cf.id}/documents/CNI",
+            files={"file": ("test.pdf", b"%PDF-1.4", "application/pdf")},
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        assert "/my-file" in response.headers["location"]

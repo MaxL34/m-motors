@@ -1,6 +1,14 @@
+import pytest
 from typing import Optional
 
 from app.models.vehicle import FuelType, TransmissionType, Vehicle, VehicleStatus
+from app.schemas.vehicle_schema import VehicleCreate, VehicleDeactivate, VehicleUpdate
+from app.services.vehicle_service import (
+    activate_vehicle,
+    create_vehicle,
+    deactivate_vehicle,
+    update_vehicle,
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -397,3 +405,63 @@ class TestVehicleDetail:
         v = make_vehicle(db, vin="VF2000000000000013", licence_plate="BB-013-BB")
         response = client.get(f"/vehicles/{v.id}")
         assert "/vehicles" in response.text
+
+
+# ── vehicle_service ───────────────────────────────────────────────────────────
+
+
+class TestVehicleService:
+
+    def _create_data(self, vin="VF3SVC00000000001", licence_plate="SV-001-SV"):
+        return VehicleCreate(
+            vin=vin,
+            licence_plate=licence_plate,
+            brand="Renault",
+            model="Clio",
+            year=2022,
+            fuel_type=FuelType.PETROL,
+            transmission_type=TransmissionType.MANUAL,
+            mileage=10000,
+            is_for_sale=True,
+            selling_price=15000.0,
+        )
+
+    def test_create_vehicle_returns_vehicle(self, db):
+        vehicle = create_vehicle(db, self._create_data())
+        assert vehicle.id is not None
+        assert vehicle.brand == "Renault"
+
+    def test_create_vehicle_starts_inactive(self, db):
+        vehicle = create_vehicle(db, self._create_data(vin="VF3SVC00000000002", licence_plate="SV-002-SV"))
+        assert vehicle.status == VehicleStatus.INACTIVE
+
+    def test_update_vehicle_changes_fields(self, db):
+        v = make_vehicle(db, vin="VF3SVC00000000003", licence_plate="SV-003-SV")
+        updated = update_vehicle(db, v.id, VehicleUpdate(brand="Peugeot", mileage=25000))
+        assert updated.brand == "Peugeot"
+        assert updated.mileage == 25000
+
+    def test_activate_inactive_vehicle(self, db):
+        v = make_vehicle(db, vin="VF3SVC00000000004", licence_plate="SV-004-SV", status=VehicleStatus.INACTIVE)
+        activated = activate_vehicle(db, v.id)
+        assert activated.status == VehicleStatus.ACTIVE
+
+    def test_activate_already_active_raises_409(self, db):
+        from fastapi import HTTPException
+        v = make_vehicle(db, vin="VF3SVC00000000005", licence_plate="SV-005-SV", status=VehicleStatus.ACTIVE)
+        with pytest.raises(HTTPException) as exc:
+            activate_vehicle(db, v.id)
+        assert exc.value.status_code == 409
+
+    def test_deactivate_active_vehicle(self, db):
+        v = make_vehicle(db, vin="VF3SVC00000000006", licence_plate="SV-006-SV", status=VehicleStatus.ACTIVE)
+        deactivated = deactivate_vehicle(db, v.id, VehicleDeactivate(deactivation_reason="Vendu"))
+        assert deactivated.status == VehicleStatus.INACTIVE
+        assert deactivated.deactivation_reason == "Vendu"
+
+    def test_deactivate_already_inactive_raises_409(self, db):
+        from fastapi import HTTPException
+        v = make_vehicle(db, vin="VF3SVC00000000007", licence_plate="SV-007-SV", status=VehicleStatus.INACTIVE)
+        with pytest.raises(HTTPException) as exc:
+            deactivate_vehicle(db, v.id, VehicleDeactivate(deactivation_reason="Raison"))
+        assert exc.value.status_code == 409

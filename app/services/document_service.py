@@ -24,19 +24,19 @@ def _validate_file(filename: str, content: bytes) -> str:
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Extension '{ext}' non supportée. Utilisez PDF, JPG ou PNG.",
         )
     for signature, mime_type, valid_exts in MAGIC_SIGNATURES:
         if content.startswith(signature):
             if ext not in valid_exts:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="Le contenu du fichier ne correspond pas à son extension.",
                 )
             return mime_type
     raise HTTPException(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail="Format non supporté. Utilisez PDF, JPG ou PNG.",
     )
 
@@ -65,7 +65,7 @@ async def upload_document(
 
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Fichier trop volumineux (max 5 Mo).",
         )
 

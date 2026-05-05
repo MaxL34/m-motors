@@ -5,7 +5,14 @@ import pytest
 
 from app.models.otp_code import OtpCode
 from app.models.user import User
-from app.services.otp_service import create_registration_otp, create_reset_otp, verify_registration_otp
+from app.services.otp_service import (
+    create_registration_otp,
+    create_reset_otp,
+    create_unlock_otp,
+    verify_registration_otp,
+    verify_reset_otp,
+    verify_unlock_otp,
+)
 from app.utils.security import create_access_token, hash_password, verify_password
 
 
@@ -123,6 +130,20 @@ class TestRegister:
         response = post_register(client, email="not-an-email")
         assert response.status_code == 422
 
+    def test_register_duplicate_phone_returns_422(self, client, db):
+        make_user(db, email="other@example.com", phone_number="0600000001")
+        response = post_register(client, phone_number="0600000001", email="new@example.com")
+        assert response.status_code == 422
+
+    def test_register_sms_failure_returns_503(self, client):
+        with patch("app.routers.auth.send_otp_sms", side_effect=Exception("SMS down")):
+            response = client.post("/register", data={
+                "first_name": "Alice", "last_name": "Martin",
+                "email": "alice@example.com", "password": "securepass",
+                "phone_number": "0600000001",
+            })
+        assert response.status_code == 503
+
 
 # ── GET /register/verify ──────────────────────────────────────────────────────
 
@@ -218,6 +239,14 @@ class TestPostRegisterVerify:
         assert response.status_code == 303
         assert "/register" in response.headers["location"]
 
+    def test_user_creation_failure_redirects_to_register(self, client, db):
+        pending_token, code = register_and_get_otp(client, db)
+        client.cookies.set("pending_otp_token", pending_token)
+        with patch("app.routers.auth.create_user_with_hash", side_effect=Exception("DB error")):
+            response = client.post("/register/verify", data={"code": code}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/register" in response.headers["location"]
+
 
 # ── Tests unitaires — otp_service ─────────────────────────────────────────────
 
@@ -245,7 +274,7 @@ class TestOtpService:
 
     def test_create_otp_sets_expiry(self, db):
         otp = self._make_otp(db)
-        assert otp.expires_at > datetime.utcnow()
+        assert otp.expires_at > datetime.now(timezone.utc).replace(tzinfo=None)
 
     def test_create_otp_starts_unused(self, db):
         otp = self._make_otp(db)
@@ -306,6 +335,75 @@ class TestOtpService:
         success, error, data = verify_registration_otp(db, otp.pending_token, otp.code)
         assert success is False
         assert data is None
+
+    def test_create_unlock_otp_stores_user_id(self, db):
+        user = make_user(db, email="unlock_otp@example.com")
+        otp = create_unlock_otp(db, user.id)
+        assert otp.user_id == user.id
+        assert otp.purpose == "unlock"
+
+    def test_create_unlock_otp_replaces_existing(self, db):
+        user = make_user(db, email="unlock_replace@example.com")
+        create_unlock_otp(db, user.id)
+        create_unlock_otp(db, user.id)
+        from app.models.otp_code import OtpCode as OTP
+        count = db.query(OTP).filter(OTP.user_id == user.id).count()
+        assert count == 1
+
+    def test_verify_unlock_otp_valid_code_returns_user_id(self, db):
+        user = make_user(db, email="unlock_verify@example.com")
+        otp = create_unlock_otp(db, user.id)
+        success, _, uid = verify_unlock_otp(db, otp.pending_token, otp.code)
+        assert success is True
+        assert uid == user.id
+
+    def test_verify_unlock_otp_wrong_code_fails(self, db):
+        user = make_user(db, email="unlock_wrong@example.com")
+        otp = create_unlock_otp(db, user.id)
+        success, error, uid = verify_unlock_otp(db, otp.pending_token, "000000")
+        assert success is False
+        assert uid is None
+
+    def test_verify_unlock_otp_invalid_token_fails(self, db):
+        success, error, uid = verify_unlock_otp(db, "invalid-token-xxx", "123456")
+        assert success is False
+        assert "invalide" in error.lower()
+
+    def test_send_otp_sms_does_not_raise(self):
+        from app.services.otp_service import send_otp_sms
+        send_otp_sms("0600000001", "123456")
+
+    def test_verify_reset_otp_invalid_token_fails(self, db):
+        success, error, uid = verify_reset_otp(db, "invalid-reset-token", "123456")
+        assert success is False
+        assert uid is None
+
+    def test_verify_reset_otp_max_attempts_blocks(self, db):
+        user = make_user(db, email="reset_max@example.com")
+        otp = create_reset_otp(db, user.id)
+        otp.attempts = 3
+        db.commit()
+        success, error, uid = verify_reset_otp(db, otp.pending_token, otp.code)
+        assert success is False
+        assert uid is None
+
+    def test_verify_unlock_otp_max_attempts_blocks(self, db):
+        user = make_user(db, email="unlock_max@example.com")
+        otp = create_unlock_otp(db, user.id)
+        otp.attempts = 3
+        db.commit()
+        success, error, uid = verify_unlock_otp(db, otp.pending_token, otp.code)
+        assert success is False
+        assert "tentative" in error.lower() or "trop" in error.lower()
+
+    def test_verify_unlock_otp_last_attempt_exhausts(self, db):
+        user = make_user(db, email="unlock_exhaust@example.com")
+        otp = create_unlock_otp(db, user.id)
+        otp.attempts = 2
+        db.commit()
+        success, error, uid = verify_unlock_otp(db, otp.pending_token, "000000")
+        assert success is False
+        assert "trop" in error.lower()
 
 
 # ── POST /login ───────────────────────────────────────────────────────────────
@@ -417,6 +515,101 @@ class TestLogin:
         db.commit()
         response = client.post("/login", data={"email": "user11@example.com", "password": "correctpass"}, follow_redirects=False)
         assert "access_token" not in response.cookies
+
+    def test_login_unlock_ready_redirects_to_unlock(self, client, db):
+        from datetime import timedelta
+        user = make_user(db, email="locked_old@example.com", password="correctpass", phone_number="0699000001")
+        user.is_locked = True
+        user.locked_at = datetime.now(timezone.utc) - timedelta(minutes=11)
+        db.commit()
+        with patch("app.routers.auth.send_otp_sms"):
+            response = client.post("/login", data={
+                "email": "locked_old@example.com", "password": "irrelevant",
+            }, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/login/unlock" in response.headers["location"]
+        assert "unlock_otp_token" in response.cookies
+
+    def test_login_locked_with_recent_locked_at_shows_remaining(self, client, db):
+        from datetime import timedelta
+        user = make_user(db, email="locked_new@example.com", password="correctpass")
+        user.is_locked = True
+        user.locked_at = datetime.now(timezone.utc) - timedelta(minutes=2)
+        db.commit()
+        response = client.post("/login", data={
+            "email": "locked_new@example.com", "password": "correctpass",
+        })
+        assert response.status_code == 403
+        assert "minute" in response.text
+
+
+# ── GET+POST /login/unlock ────────────────────────────────────────────────────
+
+class TestUnlock:
+
+    def _setup_locked_user(self, db):
+        from datetime import timedelta
+        user = make_user(db, email="locked_user@example.com", password="pass1234", phone_number="0699000099")
+        user.is_locked = True
+        user.locked_at = datetime.now(timezone.utc) - timedelta(minutes=11)
+        db.commit()
+        return user
+
+    def _trigger_unlock_flow(self, client, db):
+        user = self._setup_locked_user(db)
+        with patch("app.routers.auth.send_otp_sms"):
+            login_resp = client.post("/login", data={
+                "email": "locked_user@example.com", "password": "irrelevant",
+            }, follow_redirects=False)
+        unlock_token = login_resp.cookies.get("unlock_otp_token")
+        otp = db.query(OtpCode).filter(OtpCode.pending_token == unlock_token).first()
+        return user, unlock_token, otp.code
+
+    def test_get_unlock_without_cookie_redirects(self, client):
+        response = client.get("/login/unlock", follow_redirects=False)
+        assert response.status_code == 303
+        assert "/login" in response.headers["location"]
+
+    def test_get_unlock_with_cookie_returns_200(self, client, db):
+        _, unlock_token, _ = self._trigger_unlock_flow(client, db)
+        client.cookies.set("unlock_otp_token", unlock_token)
+        response = client.get("/login/unlock")
+        assert response.status_code == 200
+
+    def test_post_unlock_without_cookie_redirects(self, client):
+        response = client.post("/login/unlock", data={"code": "123456"}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/login" in response.headers["location"]
+
+    def test_post_unlock_valid_code_sets_access_token(self, client, db):
+        _, unlock_token, code = self._trigger_unlock_flow(client, db)
+        client.cookies.set("unlock_otp_token", unlock_token)
+        response = client.post("/login/unlock", data={"code": code}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "access_token" in response.cookies
+
+    def test_post_unlock_valid_code_unlocks_user(self, client, db):
+        user, unlock_token, code = self._trigger_unlock_flow(client, db)
+        client.cookies.set("unlock_otp_token", unlock_token)
+        client.post("/login/unlock", data={"code": code})
+        db.expire_all()
+        assert user.is_locked is False
+
+    def test_post_unlock_wrong_code_returns_422(self, client, db):
+        _, unlock_token, _ = self._trigger_unlock_flow(client, db)
+        client.cookies.set("unlock_otp_token", unlock_token)
+        response = client.post("/login/unlock", data={"code": "000000"})
+        assert response.status_code == 422
+
+    def test_post_unlock_expired_otp_redirects_to_login(self, client, db):
+        _, unlock_token, _ = self._trigger_unlock_flow(client, db)
+        otp = db.query(OtpCode).filter(OtpCode.pending_token == unlock_token).first()
+        otp.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+        client.cookies.set("unlock_otp_token", unlock_token)
+        response = client.post("/login/unlock", data={"code": "000000"}, follow_redirects=False)
+        assert response.status_code == 303
+        assert "/login" in response.headers["location"]
 
 
 # ── POST /admin/login ─────────────────────────────────────────────────────────
@@ -605,6 +798,12 @@ class TestPostForgotPassword:
             client.post("/forgot-password", data={"email": "reset@example.com"})
         mock_sms.assert_called_once()
 
+    def test_sms_failure_returns_503(self, client, db):
+        make_user(db, email="reset_sms@example.com", phone_number="0611111112")
+        with patch("app.routers.auth.send_otp_sms", side_effect=Exception("SMS down")):
+            response = client.post("/forgot-password", data={"email": "reset_sms@example.com"})
+        assert response.status_code == 503
+
 
 # ── GET /forgot-password/verify ───────────────────────────────────────────────
 
@@ -768,3 +967,24 @@ class TestPostResetPassword:
         assert user.is_locked is False
         assert user.failed_login_attempts == 0
         assert user.locked_at is None
+
+    def test_invalid_purpose_token_redirects_to_forgot(self, client, db):
+        user = _make_reset_user(db)
+        bad_token = create_access_token({"sub": str(user.id)})
+        client.cookies.set("reset_access_token", bad_token)
+        response = client.post("/reset-password",
+                               data={"new_password": "nouveau_mdp", "confirm_password": "nouveau_mdp"},
+                               follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
+
+    def test_inactive_user_redirects_to_forgot_password(self, client, db):
+        user = _make_reset_user(db)
+        user.is_active = False
+        db.commit()
+        client.cookies.set("reset_access_token", _reset_access_token(user.id))
+        response = client.post("/reset-password",
+                               data={"new_password": "nouveau_mdp", "confirm_password": "nouveau_mdp"},
+                               follow_redirects=False)
+        assert response.status_code == 303
+        assert "/forgot-password" in response.headers["location"]
