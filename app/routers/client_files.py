@@ -14,6 +14,7 @@ from app.services.client_file_service import (
     compute_progress,
     get_all_active_client_files_by_user,
     get_client_file,
+    get_closed_client_files_by_user,
     get_or_create_client_file,
 )
 from app.services.document_service import upload_document
@@ -83,12 +84,14 @@ def my_file_list(
         {"file": cf, "progress": compute_progress(cf)}
         for cf in client_files
     ]
+    closed_files = get_closed_client_files_by_user(db, current_user.id)
     return templates.TemplateResponse(
         name="customer_file/index.html",
         request=request,
         context=_ctx(
             current_user=current_user,
             files_with_progress=files_with_progress,
+            closed_files=closed_files,
             success=success,
             error=error,
         ),
@@ -106,7 +109,7 @@ def my_file_detail(
     new: bool = False,
 ):
     client_file = get_client_file(db, file_id)
-    if client_file.user_id != current_user.id:
+    if client_file.user_id != current_user.id or client_file.deleted_at is not None:
         return RedirectResponse("/my-file", status_code=303)
     progress = compute_progress(client_file)
     docs_by_type = {d.document_type: d for d in client_file.documents}
@@ -132,7 +135,7 @@ def my_file_status(
     current_user: User = Depends(require_user),
 ):
     client_file = get_client_file(db, file_id)
-    if client_file.user_id != current_user.id:
+    if client_file.user_id != current_user.id or client_file.deleted_at is not None:
         return JSONResponse({"status": None, "label": None}, status_code=403)
     return JSONResponse({
         "status": client_file.status.value,
@@ -168,7 +171,7 @@ async def upload_doc(
     file: UploadFile = File(...),
 ):
     client_file = get_client_file(db, file_id)
-    if client_file.user_id != current_user.id:
+    if client_file.user_id != current_user.id or client_file.deleted_at is not None:
         return RedirectResponse("/my-file", status_code=303)
     try:
         await upload_document(db, client_file.id, DocumentType(doc_type), file)
