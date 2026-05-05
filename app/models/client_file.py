@@ -48,6 +48,6 @@ class ClientFile(Base):
         UniqueConstraint("user_id", "vehicle_id", name="unique_user_vehicle_file"),
     )
 
-    user = relationship("User", back_populates="client_files")
+    user = relationship("User", back_populates="client_files", foreign_keys=[user_id])
     vehicle = relationship("Vehicle", back_populates="client_files")
     documents = relationship("Document", back_populates="client_file")

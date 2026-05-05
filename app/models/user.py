@@ -25,5 +25,5 @@ class User(Base):
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    client_files = relationship("ClientFile", back_populates="user")
+    client_files = relationship("ClientFile", back_populates="user", foreign_keys="ClientFile.user_id")
     favorites = relationship("Favorite", back_populates="user")
