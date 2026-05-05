@@ -44,6 +44,10 @@ class ClientFile(Base):
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_by_admin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
+    permanently_deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    permanently_deleted_by_admin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    permanently_deleted_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     __table_args__ = (
         UniqueConstraint("user_id", "vehicle_id", name="unique_user_vehicle_file"),
     )
