@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -84,7 +86,55 @@ def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate)
 
 
 def get_all_client_files(db: Session) -> list[ClientFile]:
-    return db.query(ClientFile).order_by(ClientFile.created_at.desc()).all()
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.deleted_at.is_(None))
+        .order_by(ClientFile.created_at.desc())
+        .all()
+    )
+
+
+def soft_delete_client_file(db: Session, file_id: int, admin_id: int) -> ClientFile:
+    client_file = get_client_file(db, file_id)
+    client_file.deleted_at = datetime.now(timezone.utc)
+    client_file.deleted_by_admin_id = admin_id
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
+def get_trashed_client_files(db: Session) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
+        .order_by(ClientFile.deleted_at.desc())
+        .all()
+    )
+
+
+def get_deletion_history(db: Session) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.permanently_deleted_at.is_not(None))
+        .order_by(ClientFile.permanently_deleted_at.desc())
+        .all()
+    )
+
+
+def permanent_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
+    client_file = (
+        db.query(ClientFile)
+        .filter(ClientFile.id == file_id, ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
+        .first()
+    )
+    if not client_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable dans la corbeille")
+    client_file.permanently_deleted_at = datetime.now(timezone.utc)
+    client_file.permanently_deleted_by_admin_id = admin_id
+    client_file.permanently_deleted_reason = reason
+    db.commit()
+    db.refresh(client_file)
+    return client_file
 
 
 def update_status(

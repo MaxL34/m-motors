@@ -42,5 +42,5 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    client_files: Mapped[list] = relationship("ClientFile", back_populates="user")
+    client_files: Mapped[list] = relationship("ClientFile", back_populates="user", foreign_keys="ClientFile.user_id")
     favorites: Mapped[list] = relationship("Favorite", back_populates="user")
