@@ -7,6 +7,25 @@
 <div class="mb-5 px-4 py-3 rounded-lg bg-green-50 text-green-700 text-sm">{{ success }}</div>
 {% endif %}
 
+<!-- ── Filtres ──────────────────────────────────────────────────────────────── -->
+<div class="flex items-center gap-2 mb-4">
+    <a href="/admin/customer-files"
+       class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
+              {% if not file_type_filter %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+        Tous
+    </a>
+    <a href="/admin/customer-files?file_type=SALE"
+       class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
+              {% if file_type_filter == 'SALE' %}bg-blue-600 text-white{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
+        Vente
+    </a>
+    <a href="/admin/customer-files?file_type=RENTAL"
+       class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
+              {% if file_type_filter == 'RENTAL' %}bg-purple-600 text-white{% else %}bg-purple-50 text-purple-700 hover:bg-purple-100{% endif %}">
+        Location
+    </a>
+</div>
+
 {% if files_with_progress %}
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
      x-data="{ deleteFileId: null, deleteFileName: '', deletionReason: '' }">
