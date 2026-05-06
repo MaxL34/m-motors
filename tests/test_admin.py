@@ -50,12 +50,23 @@ def make_vehicle(db, vin="VF3ADMIN000000001", licence_plate="AD-001-AD",
     return v
 
 
-def make_client_file(db, user_id, vehicle_id, status=ClientFileStatus.PENDING) -> ClientFile:
+def make_client_file(db, user_id, vehicle_id, status=ClientFileStatus.PENDING,
+                     file_type=ClientFileType.SALE) -> ClientFile:
     cf = ClientFile(
         user_id=user_id, vehicle_id=vehicle_id,
-        file_type=ClientFileType.SALE, status=status,
+        file_type=file_type, status=status,
     )
     db.add(cf)
+    db.commit()
+    db.refresh(cf)
+    return cf
+
+
+def soft_delete_file(db, cf) -> ClientFile:
+    from datetime import datetime, timezone
+    cf.deleted_at = datetime.now(timezone.utc)
+    cf.deleted_by_admin_id = 1
+    cf.deleted_reason = "Test suppression"
     db.commit()
     db.refresh(cf)
     return cf
@@ -387,3 +398,136 @@ class TestAdminDocuments:
         client.cookies.set("access_token", admin_cookie(admin.id))
         response = client.get(f"/admin/documents/{doc.id}/view")
         assert response.status_code == 200
+
+
+# ── TestAdminTrashRestore ─────────────────────────────────────────────────────
+
+
+class TestAdminTrashRestore:
+
+    def test_restore_requires_admin(self, client, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = soft_delete_file(db, make_client_file(db, user.id, vehicle.id))
+        response = client.post(f"/admin/trash/{cf.id}/restore", follow_redirects=False)
+        assert response.status_code == 303
+        assert "/admin/login" in response.headers["location"]
+
+    def test_restore_redirects_with_success(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = soft_delete_file(db, make_client_file(db, user.id, vehicle.id))
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post(f"/admin/trash/{cf.id}/restore", follow_redirects=False)
+        assert response.status_code == 303
+        assert "success" in response.headers["location"]
+
+    def test_restore_clears_deletion_fields(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = soft_delete_file(db, make_client_file(db, user.id, vehicle.id))
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        client.post(f"/admin/trash/{cf.id}/restore")
+        db.refresh(cf)
+        assert cf.deleted_at is None
+        assert cf.deleted_reason is None
+        assert cf.deleted_by_admin_id is None
+
+    def test_restore_preserves_original_status(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = soft_delete_file(db, make_client_file(db, user.id, vehicle.id, status=ClientFileStatus.IN_PROGRESS))
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        client.post(f"/admin/trash/{cf.id}/restore")
+        db.refresh(cf)
+        assert cf.status == ClientFileStatus.IN_PROGRESS
+
+    def test_restored_file_appears_in_customer_files_list(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = soft_delete_file(db, make_client_file(db, user.id, vehicle.id))
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        client.post(f"/admin/trash/{cf.id}/restore")
+        response = client.get("/admin/customer-files")
+        assert response.status_code == 200
+        assert "Renault" in response.text
+
+    def test_restore_nonexistent_file_returns_404(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post("/admin/trash/9999/restore", follow_redirects=False)
+        assert response.status_code == 404
+
+
+# ── TestAdminCustomerFilesFilters ─────────────────────────────────────────────
+
+
+class TestAdminCustomerFilesFilters:
+
+    def test_filter_by_sale_shows_only_sale_files(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VF3FL100000001A", licence_plate="FL-001-FL")
+        v2 = make_vehicle(db, vin="VF3FL200000001A", licence_plate="FL-002-FL")
+        make_client_file(db, user.id, v1.id, file_type=ClientFileType.SALE)
+        make_client_file(db, user.id, v2.id, file_type=ClientFileType.RENTAL)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files?file_type=SALE")
+        assert response.status_code == 200
+        assert response.text.count("Vente") >= 1
+
+    def test_filter_by_rental_shows_only_rental_files(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VF3FL300000001A", licence_plate="FL-003-FL")
+        v2 = make_vehicle(db, vin="VF3FL400000001A", licence_plate="FL-004-FL")
+        make_client_file(db, user.id, v1.id, file_type=ClientFileType.SALE)
+        make_client_file(db, user.id, v2.id, file_type=ClientFileType.RENTAL)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files?file_type=RENTAL")
+        assert response.status_code == 200
+        assert response.text.count("Location") >= 1
+
+    def test_filter_by_status(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VF3FS100000001A", licence_plate="FS-001-FS")
+        v2 = make_vehicle(db, vin="VF3FS200000001A", licence_plate="FS-002-FS")
+        make_client_file(db, user.id, v1.id, status=ClientFileStatus.PENDING)
+        make_client_file(db, user.id, v2.id, status=ClientFileStatus.IN_PROGRESS)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files?status_filter=PENDING")
+        assert response.status_code == 200
+
+    def test_sort_by_date_asc_returns_200(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files?sort_by=created_at&sort_order=asc")
+        assert response.status_code == 200
+
+    def test_sort_by_progress_desc_returns_200(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files?sort_by=progress&sort_order=desc")
+        assert response.status_code == 200
+
+    def test_invalid_sort_by_falls_back_gracefully(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files?sort_by=invalid_field")
+        assert response.status_code == 200
+
+    def test_soft_deleted_files_excluded_from_list(self, client, db):
+        admin = make_admin(db)
+        user = make_user(db)
+        vehicle = make_vehicle(db, vin="VF3EXC00000001A", licence_plate="EX-001-EX")
+        cf = make_client_file(db, user.id, vehicle.id)
+        soft_delete_file(db, cf)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/customer-files")
+        assert response.status_code == 200
+        assert "EX-001-EX" not in response.text
