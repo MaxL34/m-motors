@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
-from app.models.client_file import ClientFile, ClientFileStatus
+from app.models.client_file import ClientFile, ClientFileStatus, ClientFileType
 from app.models.document import DocumentStatus
 from app.schemas.client_file_schema import ClientFileCreate
 
@@ -90,13 +90,11 @@ def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate)
     return client_file
 
 
-def get_all_client_files(db: Session) -> list[ClientFile]:
-    return (
-        db.query(ClientFile)
-        .filter(ClientFile.deleted_at.is_(None))
-        .order_by(ClientFile.created_at.desc())
-        .all()
-    )
+def get_all_client_files(db: Session, file_type: ClientFileType | None = None) -> list[ClientFile]:
+    query = db.query(ClientFile).filter(ClientFile.deleted_at.is_(None))
+    if file_type:
+        query = query.filter(ClientFile.file_type == file_type)
+    return query.order_by(ClientFile.created_at.desc()).all()
 
 
 def soft_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
