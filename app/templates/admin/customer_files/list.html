@@ -8,22 +8,77 @@
 {% endif %}
 
 <!-- ── Filtres ──────────────────────────────────────────────────────────────── -->
-<div class="flex items-center gap-2 mb-4">
-    <a href="/admin/customer-files"
-       class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
-              {% if not file_type_filter %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
-        Tous
-    </a>
-    <a href="/admin/customer-files?file_type=SALE"
-       class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
-              {% if file_type_filter == 'SALE' %}bg-blue-600 text-white{% else %}bg-blue-50 text-blue-700 hover:bg-blue-100{% endif %}">
-        Vente
-    </a>
-    <a href="/admin/customer-files?file_type=RENTAL"
-       class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
-              {% if file_type_filter == 'RENTAL' %}bg-purple-600 text-white{% else %}bg-purple-50 text-purple-700 hover:bg-purple-100{% endif %}">
-        Location
-    </a>
+<div x-data="{ sortBy: '{{ sort_by or '' }}', sortOrder: '{{ sort_order or 'desc' }}' }">
+<form id="filters-form" method="get" action="/admin/customer-files" class="mb-4">
+    <input type="hidden" name="sort_by" :value="sortBy">
+    <input type="hidden" name="sort_order" :value="sortOrder">
+
+    <div class="flex items-center gap-3 flex-wrap">
+
+        <!-- Type -->
+        <div class="flex gap-1.5">
+            {% for val, label, active_cls, inactive_cls in [
+                ('', 'Tous', 'bg-gray-900 text-white', 'bg-gray-100 text-gray-600 hover:bg-gray-200'),
+                ('SALE', 'Vente', 'bg-blue-600 text-white', 'bg-blue-50 text-blue-700 hover:bg-blue-100'),
+                ('RENTAL', 'Location', 'bg-purple-600 text-white', 'bg-purple-50 text-purple-700 hover:bg-purple-100')
+            ] %}
+            <label class="cursor-pointer">
+                <input type="radio" name="file_type" value="{{ val }}" class="hidden"
+                       {% if file_type_filter == val or (not file_type_filter and val == '') %}checked{% endif %}
+                       onchange="document.getElementById('filters-form').submit()">
+                <span class="text-xs font-medium px-3 py-1.5 rounded-full transition-colors
+                             {% if file_type_filter == val or (not file_type_filter and val == '') %}{{ active_cls }}{% else %}{{ inactive_cls }}{% endif %}">
+                    {{ label }}
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+
+        <!-- Statut -->
+        <select name="status_filter" onchange="document.getElementById('filters-form').submit()"
+                class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-700 bg-white focus:outline-none focus:border-gray-400 cursor-pointer">
+            <option value="">Tous les statuts</option>
+            {% for s in client_file_statuses %}
+            <option value="{{ s.value }}" {% if status_filter == s.value %}selected{% endif %}>
+                {{ file_status_labels[s.value] }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <!-- Tris -->
+        <div class="flex gap-1.5 ml-auto">
+            <button type="button"
+                    @click="
+                        sortBy === 'created_at'
+                            ? sortOrder = (sortOrder === 'desc' ? 'asc' : 'desc')
+                            : (sortBy = 'created_at', sortOrder = 'desc');
+                        $nextTick(() => document.getElementById('filters-form').submit())
+                    "
+                    class="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors
+                           {% if sort_by == 'created_at' %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                Date
+                {% if sort_by == 'created_at' %}
+                    {{ "↑" if sort_order == "asc" else "↓" }}
+                {% else %}↕{% endif %}
+            </button>
+            <button type="button"
+                    @click="
+                        sortBy === 'progress'
+                            ? sortOrder = (sortOrder === 'desc' ? 'asc' : 'desc')
+                            : (sortBy = 'progress', sortOrder = 'desc');
+                        $nextTick(() => document.getElementById('filters-form').submit())
+                    "
+                    class="flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-colors
+                           {% if sort_by == 'progress' %}bg-gray-900 text-white{% else %}bg-gray-100 text-gray-600 hover:bg-gray-200{% endif %}">
+                Avancement
+                {% if sort_by == 'progress' %}
+                    {{ "↑" if sort_order == "asc" else "↓" }}
+                {% else %}↕{% endif %}
+            </button>
+        </div>
+
+    </div>
+</form>
 </div>
 
 {% if files_with_progress %}
