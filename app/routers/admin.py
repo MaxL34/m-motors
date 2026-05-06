@@ -385,10 +385,25 @@ def admin_customer_files(
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
     file_type: str | None = None,
+    status_filter: str | None = None,
+    sort_by: str | None = None,
+    sort_order: str = "desc",
 ):
+    if sort_by not in ("created_at", "progress"):
+        sort_by = None
+    if sort_order not in ("asc", "desc"):
+        sort_order = "desc"
+
     file_type_enum = ClientFileType(file_type) if file_type in ClientFileType._value2member_map_ else None
-    files = get_all_client_files(db, file_type=file_type_enum)
+    status_enum = ClientFileStatus(status_filter) if status_filter in ClientFileStatus._value2member_map_ else None
+
+    db_sort_by = sort_by if sort_by == "created_at" else "created_at"
+    files = get_all_client_files(db, file_type=file_type_enum, status=status_enum, sort_by=db_sort_by, sort_order=sort_order)
     files_with_progress = [(f, compute_progress(f)) for f in files]
+
+    if sort_by == "progress":
+        files_with_progress.sort(key=lambda x: x[1], reverse=(sort_order == "desc"))
+
     return templates.TemplateResponse(
         name="admin/customer_files/list.html",
         request=request,
@@ -396,6 +411,9 @@ def admin_customer_files(
             current_admin=current_admin,
             files_with_progress=files_with_progress,
             file_type_filter=file_type,
+            status_filter=status_filter,
+            sort_by=sort_by,
+            sort_order=sort_order,
         ),
     )
 
