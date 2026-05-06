@@ -13,9 +13,11 @@ from app.schemas.client_file_schema import ClientFileCreate
 from app.schemas.document_schema import DocumentRefuse
 from app.services.client_file_service import (
     compute_progress,
+    get_all_client_files,
     get_client_file,
     get_client_file_by_user,
     get_or_create_client_file,
+    restore_client_file,
     update_status,
     TOTAL_DOCUMENT_TYPES,
     MAX_ACTIVE_FILES,
@@ -747,3 +749,185 @@ class TestClientFilesRouter:
         )
         assert response.status_code == 303
         assert "/my-file" in response.headers["location"]
+
+
+# ── restore_client_file ───────────────────────────────────────────────────────
+
+class TestRestoreClientFile:
+
+    def _soft_delete(self, db, cf):
+        from datetime import datetime, timezone
+        cf.deleted_at = datetime.now(timezone.utc)
+        cf.deleted_by_admin_id = 1
+        cf.deleted_reason = "Test suppression"
+        db.commit()
+
+    def test_clears_deletion_fields(self, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        self._soft_delete(db, cf)
+
+        restored = restore_client_file(db, cf.id)
+
+        assert restored.deleted_at is None
+        assert restored.deleted_by_admin_id is None
+        assert restored.deleted_reason is None
+
+    def test_preserves_original_status(self, db):
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id, status=ClientFileStatus.IN_PROGRESS)
+        self._soft_delete(db, cf)
+
+        restored = restore_client_file(db, cf.id)
+
+        assert restored.status == ClientFileStatus.IN_PROGRESS
+
+    def test_raises_404_when_file_not_soft_deleted(self, db):
+        from fastapi import HTTPException
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+
+        with pytest.raises(HTTPException) as exc:
+            restore_client_file(db, cf.id)
+        assert exc.value.status_code == 404
+
+    def test_raises_404_when_permanently_deleted(self, db):
+        from datetime import datetime, timezone
+        from fastapi import HTTPException
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        cf.deleted_at = datetime.now(timezone.utc)
+        cf.permanently_deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        with pytest.raises(HTTPException) as exc:
+            restore_client_file(db, cf.id)
+        assert exc.value.status_code == 404
+
+    def test_raises_404_for_unknown_id(self, db):
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc:
+            restore_client_file(db, 9999)
+        assert exc.value.status_code == 404
+
+
+# ── get_all_client_files filters ──────────────────────────────────────────────
+
+class TestGetAllClientFilesFilters:
+
+    def test_returns_all_when_no_filter(self, db):
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000ALL1")
+        v2 = make_vehicle(db, vin="VIN000000000ALL2")
+        make_client_file(db, user.id, v1.id)
+        make_client_file(db, user.id, v2.id)
+
+        result = get_all_client_files(db)
+
+        assert len(result) == 2
+
+    def test_filters_by_file_type_sale(self, db):
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000SL01")
+        v2 = make_vehicle(db, vin="VIN000000000RT01")
+        sale = ClientFile(user_id=user.id, vehicle_id=v1.id, file_type=ClientFileType.SALE, status=ClientFileStatus.PENDING)
+        rental = ClientFile(user_id=user.id, vehicle_id=v2.id, file_type=ClientFileType.RENTAL, status=ClientFileStatus.PENDING)
+        db.add_all([sale, rental])
+        db.commit()
+
+        result = get_all_client_files(db, file_type=ClientFileType.SALE)
+
+        assert len(result) == 1
+        assert result[0].file_type == ClientFileType.SALE
+
+    def test_filters_by_file_type_rental(self, db):
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000SL02")
+        v2 = make_vehicle(db, vin="VIN000000000RT02")
+        sale = ClientFile(user_id=user.id, vehicle_id=v1.id, file_type=ClientFileType.SALE, status=ClientFileStatus.PENDING)
+        rental = ClientFile(user_id=user.id, vehicle_id=v2.id, file_type=ClientFileType.RENTAL, status=ClientFileStatus.PENDING)
+        db.add_all([sale, rental])
+        db.commit()
+
+        result = get_all_client_files(db, file_type=ClientFileType.RENTAL)
+
+        assert len(result) == 1
+        assert result[0].file_type == ClientFileType.RENTAL
+
+    def test_filters_by_status(self, db):
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000ST01")
+        v2 = make_vehicle(db, vin="VIN000000000ST02")
+        make_client_file(db, user.id, v1.id, status=ClientFileStatus.PENDING)
+        make_client_file(db, user.id, v2.id, status=ClientFileStatus.IN_PROGRESS)
+
+        result = get_all_client_files(db, status=ClientFileStatus.PENDING)
+
+        assert len(result) == 1
+        assert result[0].status == ClientFileStatus.PENDING
+
+    def test_excludes_soft_deleted_files(self, db):
+        from datetime import datetime, timezone
+        user = make_user(db)
+        vehicle = make_vehicle(db)
+        cf = make_client_file(db, user.id, vehicle.id)
+        cf.deleted_at = datetime.now(timezone.utc)
+        db.commit()
+
+        result = get_all_client_files(db)
+
+        assert len(result) == 0
+
+    def test_sort_created_at_desc(self, db):
+        from datetime import datetime, timezone, timedelta
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000DT01")
+        v2 = make_vehicle(db, vin="VIN000000000DT02")
+        cf_old = make_client_file(db, user.id, v1.id)
+        cf_new = make_client_file(db, user.id, v2.id)
+        cf_old.created_at = datetime.now(timezone.utc) - timedelta(days=1)
+        cf_new.created_at = datetime.now(timezone.utc)
+        db.commit()
+
+        result = get_all_client_files(db, sort_by="created_at", sort_order="desc")
+
+        assert result[0].id == cf_new.id
+        assert result[1].id == cf_old.id
+
+    def test_sort_created_at_asc(self, db):
+        from datetime import datetime, timezone, timedelta
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000DT03")
+        v2 = make_vehicle(db, vin="VIN000000000DT04")
+        cf_old = make_client_file(db, user.id, v1.id)
+        cf_new = make_client_file(db, user.id, v2.id)
+        cf_old.created_at = datetime.now(timezone.utc) - timedelta(days=1)
+        cf_new.created_at = datetime.now(timezone.utc)
+        db.commit()
+
+        result = get_all_client_files(db, sort_by="created_at", sort_order="asc")
+
+        assert result[0].id == cf_old.id
+        assert result[1].id == cf_new.id
+
+    def test_combined_file_type_and_status_filter(self, db):
+        user = make_user(db)
+        v1 = make_vehicle(db, vin="VIN000000000CB01")
+        v2 = make_vehicle(db, vin="VIN000000000CB02")
+        v3 = make_vehicle(db, vin="VIN000000000CB03")
+        sale_pending = ClientFile(user_id=user.id, vehicle_id=v1.id, file_type=ClientFileType.SALE, status=ClientFileStatus.PENDING)
+        sale_in_progress = ClientFile(user_id=user.id, vehicle_id=v2.id, file_type=ClientFileType.SALE, status=ClientFileStatus.IN_PROGRESS)
+        rental_pending = ClientFile(user_id=user.id, vehicle_id=v3.id, file_type=ClientFileType.RENTAL, status=ClientFileStatus.PENDING)
+        db.add_all([sale_pending, sale_in_progress, rental_pending])
+        db.commit()
+
+        result = get_all_client_files(db, file_type=ClientFileType.SALE, status=ClientFileStatus.PENDING)
+
+        assert len(result) == 1
+        assert result[0].file_type == ClientFileType.SALE
+        assert result[0].status == ClientFileStatus.PENDING
