@@ -140,6 +140,22 @@ def get_deletion_history(db: Session) -> list[ClientFile]:
     )
 
 
+def restore_client_file(db: Session, file_id: int) -> ClientFile:
+    client_file = (
+        db.query(ClientFile)
+        .filter(ClientFile.id == file_id, ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
+        .first()
+    )
+    if not client_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable dans la corbeille")
+    client_file.deleted_at = None
+    client_file.deleted_by_admin_id = None
+    client_file.deleted_reason = None
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
 def permanent_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
     client_file = (
         db.query(ClientFile)

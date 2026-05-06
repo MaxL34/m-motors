@@ -19,7 +19,7 @@
 </div>
 
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-10"
-     x-data="{ deleteFileId: null, deleteFileName: '', deletionReason: '' }">
+     x-data="{ deleteFileId: null, deleteFileName: '', deletionReason: '', restoreFileId: null, restoreFileName: '' }">
     <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -57,7 +57,12 @@
                 <td class="px-4 py-3 text-xs text-gray-400">
                     {{ file.deleted_at.strftime('%d/%m/%Y à %H:%M') if file.deleted_at else '—' }}
                 </td>
-                <td class="px-4 py-3 text-right">
+                <td class="px-4 py-3 text-right flex items-center justify-end gap-3">
+                    <button type="button"
+                            @click="restoreFileId = {{ file.id }}; restoreFileName = '{{ file.user.first_name }} {{ file.user.last_name }} — {{ file.vehicle.brand }} {{ file.vehicle.model }}'"
+                            class="text-xs font-medium text-green-600 hover:text-green-800 transition-colors">
+                        Restaurer
+                    </button>
                     <button type="button"
                             @click="deleteFileId = {{ file.id }}; deleteFileName = '{{ file.user.first_name }} {{ file.user.last_name }} — {{ file.vehicle.brand }} {{ file.vehicle.model }}'"
                             class="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
@@ -68,6 +73,39 @@
             {% endfor %}
         </tbody>
     </table>
+
+    <!-- Modal confirmation restauration -->
+    <div x-show="restoreFileId !== null" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3"/>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-base font-semibold text-gray-900">Restaurer le dossier</h3>
+                    <p class="text-xs text-gray-500">Le dossier retrouvera son statut d'origine.</p>
+                </div>
+            </div>
+            <p class="text-sm text-gray-600 mb-4">
+                Le dossier de <span class="font-semibold text-gray-800" x-text="restoreFileName"></span> sera remis dans les dossiers actifs.
+            </p>
+            <form :action="`/admin/trash/${restoreFileId}/restore`" method="post">
+                <div class="flex gap-2 justify-end">
+                    <button type="button" @click="restoreFileId = null"
+                            class="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
+                        Annuler
+                    </button>
+                    <button type="submit"
+                            class="text-sm px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors">
+                        Confirmer la restauration
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Modal confirmation suppression définitive -->
     <div x-show="deleteFileId !== null" x-cloak

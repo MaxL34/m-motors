@@ -22,6 +22,7 @@ from app.services.client_file_service import (
     get_deletion_history,
     get_trashed_client_files,
     permanent_delete_client_file,
+    restore_client_file,
     soft_delete_client_file,
     update_status,
 )
@@ -523,6 +524,19 @@ def admin_trash(
             "file_status_labels": FILE_STATUS_LABELS,
             "success": success,
         },
+    )
+
+
+@router.post("/trash/{file_id}/restore")
+def admin_restore_client_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+):
+    restore_client_file(db, file_id)
+    return RedirectResponse(
+        "/admin/trash?success=Dossier+restauré+avec+succès",
+        status_code=303,
     )
 
 
