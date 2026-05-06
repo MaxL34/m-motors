@@ -90,11 +90,21 @@ def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate)
     return client_file
 
 
-def get_all_client_files(db: Session, file_type: ClientFileType | None = None) -> list[ClientFile]:
+def get_all_client_files(
+    db: Session,
+    file_type: ClientFileType | None = None,
+    status: ClientFileStatus | None = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> list[ClientFile]:
     query = db.query(ClientFile).filter(ClientFile.deleted_at.is_(None))
     if file_type:
         query = query.filter(ClientFile.file_type == file_type)
-    return query.order_by(ClientFile.created_at.desc()).all()
+    if status:
+        query = query.filter(ClientFile.status == status)
+    col = ClientFile.created_at
+    query = query.order_by(col.asc() if sort_order == "asc" else col.desc())
+    return query.all()
 
 
 def soft_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
