@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 5
     UPLOAD_DIR: str = "app/static/uploads"
     SENTRY_DSN: str = ""
+    ENVIRONMENT: str = "development"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

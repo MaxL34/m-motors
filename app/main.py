@@ -19,10 +19,11 @@ setup_logging()
 if settings.SENTRY_DSN:
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
-        traces_sample_rate=0.2,   # 20 % des transactions tracées (performance)
-        send_default_pii=False,   # pas de données personnelles envoyées
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=0.2,
+        send_default_pii=False,
     )
-    logger.info("Sentry initialisé")
+    logger.info(f"Sentry initialisé (environment={settings.ENVIRONMENT})")
 else:
     logger.warning("SENTRY_DSN non configuré — alerting désactivé")
 
