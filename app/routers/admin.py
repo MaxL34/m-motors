@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.client_file import ClientFileStatus
+from app.models.client_file import ClientFileStatus, ClientFileType
 from app.models.document import DocumentType
 from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
@@ -384,13 +384,19 @@ def admin_customer_files(
     request: Request,
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_admin),
+    file_type: str | None = None,
 ):
-    files = get_all_client_files(db)
+    file_type_enum = ClientFileType(file_type) if file_type in ClientFileType._value2member_map_ else None
+    files = get_all_client_files(db, file_type=file_type_enum)
     files_with_progress = [(f, compute_progress(f)) for f in files]
     return templates.TemplateResponse(
         name="admin/customer_files/list.html",
         request=request,
-        context=_cf_ctx(current_admin=current_admin, files_with_progress=files_with_progress),
+        context=_cf_ctx(
+            current_admin=current_admin,
+            files_with_progress=files_with_progress,
+            file_type_filter=file_type,
+        ),
     )
 
 
