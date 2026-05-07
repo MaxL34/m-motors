@@ -75,7 +75,14 @@ def vehicle_detail(
 ):
     try:
         vehicle = get_vehicle(db, vehicle_id)
-    except HTTPException:
+    except HTTPException as e:
+        if e.status_code == 404:
+            return templates.TemplateResponse(
+                name="vehicles/404.html",
+                request=request,
+                context={"current_user": current_user},
+                status_code=404,
+            )
         raise
     except Exception as e:
         logger.error(f"Erreur inattendue lors du chargement du véhicule {vehicle_id}: {e}")
