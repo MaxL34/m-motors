@@ -285,6 +285,10 @@ class TestVehicleDetail:
         response = client.get(f"/vehicles/{v.id}")
         assert response.status_code == 200
 
+    def test_detail_unknown_vehicle_returns_404_not_500(self, client):
+        response = client.get("/vehicles/99999")
+        assert response.status_code == 404
+
     def test_detail_404_unknown_vehicle(self, client):
         response = client.get("/vehicles/99999")
         assert response.status_code == 404

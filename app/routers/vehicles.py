@@ -1,8 +1,9 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -72,7 +73,13 @@ def vehicle_detail(
     current_user: Optional[User] = Depends(get_current_user),
     error: Optional[str] = None,
 ):
-    vehicle = get_vehicle(db, vehicle_id)
+    try:
+        vehicle = get_vehicle(db, vehicle_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur inattendue lors du chargement du véhicule {vehicle_id}: {e}")
+        raise HTTPException(status_code=500, detail="Erreur interne du serveur")
     fav = is_favorite(db, current_user.id, vehicle_id) if current_user else False
     return templates.TemplateResponse(
         name="vehicles/detail.html",
