@@ -100,7 +100,11 @@ async def register(
             context={"errors": ["Impossible d'envoyer le SMS de vérification. Réessayez."], "form_data": form_data},
             status_code=503,
         )
-    response = RedirectResponse("/register/verify", status_code=303)
+    response = templates.TemplateResponse(
+        name="auth/verify_otp.html",
+        request=request,
+        context={"demo_code": otp.code},
+    )
     response.set_cookie(
         PENDING_COOKIE_NAME, otp.pending_token,
         httponly=True, samesite="lax", max_age=600,
@@ -176,7 +180,11 @@ async def login(
             send_otp_sms(user.phone_number, otp.code)
         except Exception as exc:
             logger.error(f"OTP SMS send failed during unlock: {exc}")
-        response = RedirectResponse("/login/unlock", status_code=303)
+        response = templates.TemplateResponse(
+            name="auth/unlock_otp.html",
+            request=request,
+            context={"demo_code": otp.code},
+        )
         response.set_cookie(
             UNLOCK_COOKIE_NAME, otp.pending_token,
             httponly=True, samesite="lax", max_age=600,
@@ -331,7 +339,11 @@ async def post_forgot_password(
             status_code=503,
         )
 
-    response = RedirectResponse("/forgot-password/verify", status_code=303)
+    response = templates.TemplateResponse(
+        name="auth/reset_otp.html",
+        request=request,
+        context={"demo_code": otp.code},
+    )
     response.set_cookie(
         RESET_OTP_COOKIE, otp.pending_token,
         httponly=True, samesite="lax", max_age=600,
