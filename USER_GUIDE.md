@@ -98,13 +98,13 @@ L'application est accessible à l'adresse : **https://thorough-freedom.up.railwa
 
 ## Rôles et permissions
 
-| Fonctionnalité | Visiteur | Client connecté | Admin |
-|---|:---:|:---:|:---:|
-| Consulter le catalogue | ✓ | ✓ | ✓ |
-| Créer un compte | ✓ | — | — |
-| Gérer ses favoris | — | ✓ | — |
-| Ouvrir / suivre un dossier | — | ✓ | — |
-| Gérer son profil | — | ✓ | ✓ |
-| Gérer le catalogue (admin) | — | — | ✓ |
-| Gérer les dossiers clients | — | — | ✓ |
-| Accéder à la corbeille | — | — | ✓ |
+| Fonctionnalité                  | Visiteur | Client connecté | Administrateur |
+|:--------------------------------|:--------:|:---------------:|:--------------:|
+| Consulter le catalogue          |    ✓     |        ✓        |       ✓        |
+| Créer un compte                 |    ✓     |        —        |       —        |
+| Gérer ses favoris               |    —     |        ✓        |       —        |
+| Ouvrir / suivre un dossier      |    —     |        ✓        |       —        |
+| Gérer son profil                |    —     |        ✓        |       ✓        |
+| Gérer le catalogue              |    —     |        —        |       ✓        |
+| Gérer les dossiers clients      |    —     |        —        |       ✓        |
+| Accéder à la corbeille          |    —     |        —        |       ✓        |
