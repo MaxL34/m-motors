@@ -531,3 +531,79 @@ class TestAdminCustomerFilesFilters:
         response = client.get("/admin/customer-files")
         assert response.status_code == 200
         assert "EX-001-EX" not in response.text
+
+
+# ── TestAdminProfile ──────────────────────────────────────────────────────────
+
+
+class TestAdminProfile:
+
+    def test_get_profile_requires_auth(self, client):
+        response = client.get("/admin/profile", follow_redirects=False)
+        assert response.status_code == 303
+        assert "/admin/login" in response.headers["location"]
+
+    def test_get_profile_returns_200(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.get("/admin/profile")
+        assert response.status_code == 200
+        assert admin.first_name in response.text
+
+    def test_post_profile_updates_data(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post("/admin/profile", data={
+            "first_name": "Nouveau",
+            "last_name": "Nom",
+            "email": "nouveau@test.com",
+        })
+        assert response.status_code == 200
+        db.refresh(admin)
+        assert admin.first_name == "Nouveau"
+        assert admin.last_name == "Nom"
+        assert admin.email == "nouveau@test.com"
+
+    def test_post_profile_duplicate_email_returns_422(self, client, db):
+        admin = make_admin(db)
+        make_user(db, email="existing@test.com")
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post("/admin/profile", data={
+            "first_name": "Admin",
+            "last_name": "Test",
+            "email": "existing@test.com",
+        })
+        assert response.status_code == 422
+
+    def test_post_password_changes_password(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post("/admin/profile/password", data={
+            "current_password": "adminpass",
+            "new_password": "newpassword123",
+            "confirm_password": "newpassword123",
+        })
+        assert response.status_code == 200
+        db.refresh(admin)
+        from app.utils.security import verify_password
+        assert verify_password("newpassword123", admin.password_hash)
+
+    def test_post_password_wrong_current_returns_422(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post("/admin/profile/password", data={
+            "current_password": "wrongpassword",
+            "new_password": "newpassword123",
+            "confirm_password": "newpassword123",
+        })
+        assert response.status_code == 422
+
+    def test_post_password_mismatch_returns_422(self, client, db):
+        admin = make_admin(db)
+        client.cookies.set("access_token", admin_cookie(admin.id))
+        response = client.post("/admin/profile/password", data={
+            "current_password": "adminpass",
+            "new_password": "newpassword123",
+            "confirm_password": "different456",
+        })
+        assert response.status_code == 422
