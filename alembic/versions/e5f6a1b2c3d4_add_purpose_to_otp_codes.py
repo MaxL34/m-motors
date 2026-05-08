@@ -1,7 +1,7 @@
 """add purpose to otp_codes
 
-Revision ID: a1b2c3d4e5f6
-Revises: c9d1e2f3a4b5
+Revision ID: e5f6a1b2c3d4
+Revises: 9de5eacb0397
 Create Date: 2026-05-04 00:00:00.000000
 
 """
@@ -10,7 +10,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'e5f6a1b2c3d4'
 down_revision: Union[str, Sequence[str], None] = '9de5eacb0397'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
