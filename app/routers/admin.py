@@ -14,6 +14,7 @@ from app.models.document import DocumentType
 from app.models.user import User
 from app.models.vehicle import FuelType, TransmissionType, VehicleStatus
 from app.schemas.document_schema import DocumentRefuse
+from app.schemas.user_schema import PasswordChange, UserUpdate
 from app.schemas.vehicle_schema import VehicleCreate, VehicleDeactivate, VehicleUpdate
 from app.services.client_file_service import (
     compute_progress,
@@ -33,6 +34,7 @@ from app.services.document_service import (
     unlock_document,
     validate_document,
 )
+from app.services.auth_service import change_password, update_user
 from app.services.vehicle_service import (
     activate_vehicle,
     create_vehicle,
@@ -575,4 +577,73 @@ def admin_permanent_delete_client_file(
     return RedirectResponse(
         "/admin/trash?success=Dossier+supprimé+définitivement",
         status_code=303,
+    )
+
+
+# ── Profil admin ───────────────────────────────────────────────────────────────
+
+@router.get("/profile", response_class=HTMLResponse)
+def admin_profile_page(request: Request, current_admin: User = Depends(require_admin)):
+    return templates.TemplateResponse(
+        name="admin/profile/index.html",
+        request=request,
+        context={"current_admin": current_admin, "success": None, "errors": [], "pwd_errors": [], "pwd_success": None},
+    )
+
+
+@router.post("/profile", response_class=HTMLResponse)
+async def admin_profile_update(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+    first_name: str = Form(...),
+    last_name: str = Form(...),
+    email: str = Form(...),
+):
+    try:
+        data = UserUpdate(first_name=first_name, last_name=last_name, email=email)
+        update_user(db, current_admin, data)
+        return templates.TemplateResponse(
+            name="admin/profile/index.html",
+            request=request,
+            context={"current_admin": current_admin, "success": "Profil mis à jour.", "errors": [], "pwd_errors": [], "pwd_success": None},
+        )
+    except ValidationError as e:
+        errors = [err["msg"].replace("Value error, ", "") for err in e.errors()]
+    except Exception as e:
+        errors = [str(e.detail) if hasattr(e, "detail") else str(e)]
+    return templates.TemplateResponse(
+        name="admin/profile/index.html",
+        request=request,
+        context={"current_admin": current_admin, "success": None, "errors": errors, "pwd_errors": [], "pwd_success": None},
+        status_code=422,
+    )
+
+
+@router.post("/profile/password", response_class=HTMLResponse)
+async def admin_profile_password(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: User = Depends(require_admin),
+    current_password: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+):
+    try:
+        data = PasswordChange(current_password=current_password, new_password=new_password, confirm_password=confirm_password)
+        change_password(db, current_admin, data)
+        return templates.TemplateResponse(
+            name="admin/profile/index.html",
+            request=request,
+            context={"current_admin": current_admin, "success": None, "errors": [], "pwd_errors": [], "pwd_success": "Mot de passe modifié."},
+        )
+    except ValidationError as e:
+        pwd_errors = [err["msg"].replace("Value error, ", "") for err in e.errors()]
+    except Exception as e:
+        pwd_errors = [str(e.detail) if hasattr(e, "detail") else str(e)]
+    return templates.TemplateResponse(
+        name="admin/profile/index.html",
+        request=request,
+        context={"current_admin": current_admin, "success": None, "errors": [], "pwd_errors": pwd_errors, "pwd_success": None},
+        status_code=422,
     )
