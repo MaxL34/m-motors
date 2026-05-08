@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 5
     UPLOAD_DIR: str = "app/static/uploads"
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
