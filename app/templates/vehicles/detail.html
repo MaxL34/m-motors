@@ -131,8 +131,8 @@
                 {{ vehicle.licence_plate }}
             </div>
 
-            {% if current_user %}
             <!-- Ouvrir un dossier -->
+            {% if current_user %}
             <form method="post" action="/my-file/open" class="mb-3">
                 <input type="hidden" name="vehicle_id" value="{{ vehicle.id }}">
                 <input type="hidden" name="file_type" value="{{ 'SALE' if vehicle.is_for_sale else 'RENTAL' }}">

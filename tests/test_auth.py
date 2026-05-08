@@ -59,10 +59,10 @@ def register_and_get_otp(client, db, *, phone_number="0600000001", **overrides):
 
 class TestRegister:
 
-    def test_register_with_phone_redirects_to_verify(self, client):
+    def test_register_with_phone_shows_verify_page(self, client):
         response = post_register(client)
-        assert response.status_code == 303
-        assert "/register/verify" in response.headers["location"]
+        assert response.status_code == 200
+        assert "Mode démo" in response.text
 
     def test_register_with_phone_sets_pending_cookie(self, client):
         response = post_register(client)
