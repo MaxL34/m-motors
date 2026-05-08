@@ -1,0 +1,130 @@
+{% extends "shared/base.html" %}
+{% block title %}Mon profil — M-Motors{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Mon profil</h1>
+
+    <!-- Infos personnelles -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Informations personnelles</h2>
+
+        {% if success %}
+        <div class="mb-4 px-4 py-3 rounded-lg bg-green-50 text-green-700 text-sm">{{ success }}</div>
+        {% endif %}
+        {% if errors %}
+        <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 text-sm space-y-1">
+            {% for e in errors %}<p>{{ e }}</p>{% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/profile" class="flex flex-col gap-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                    <input type="text" name="first_name" value="{{ current_user.first_name }}" required
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                    <input type="text" name="last_name" value="{{ current_user.last_name }}" required
+                           class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Adresse e-mail</label>
+                <input type="email" name="email" value="{{ current_user.email }}" required
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Téléphone <span class="text-gray-400">(optionnel)</span></label>
+                <input type="tel" name="phone_number" value="{{ current_user.phone_number or '' }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Adresse <span class="text-gray-400">(optionnel)</span></label>
+                <input type="text" name="address" value="{{ current_user.address or '' }}"
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+            </div>
+            <button type="submit"
+                    class="self-start bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+                Enregistrer
+            </button>
+        </form>
+    </div>
+
+    <!-- Mot de passe -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <h2 class="text-base font-semibold text-gray-800 mb-4">Changer le mot de passe</h2>
+
+        {% if pwd_success %}
+        <div class="mb-4 px-4 py-3 rounded-lg bg-green-50 text-green-700 text-sm">{{ pwd_success }}</div>
+        {% endif %}
+        {% if pwd_errors %}
+        <div class="mb-4 px-4 py-3 rounded-lg bg-red-50 text-red-700 text-sm space-y-1">
+            {% for e in pwd_errors %}<p>{{ e }}</p>{% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" action="/profile/password" class="flex flex-col gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe actuel</label>
+                <input type="password" name="current_password" required
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe</label>
+                <input type="password" name="new_password" required
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+                <p class="text-xs text-gray-400 mt-1">8 caractères minimum</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Confirmer le nouveau mot de passe</label>
+                <input type="password" name="confirm_password" required
+                       class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none">
+            </div>
+            <button type="submit"
+                    class="self-start bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+                Modifier le mot de passe
+            </button>
+        </form>
+    </div>
+
+    <!-- Suppression du compte -->
+    <div class="bg-white rounded-2xl shadow-sm border border-red-100 p-6 mt-6" x-data="{ open: false }">
+        <h2 class="text-base font-semibold text-red-700 mb-1">Supprimer mon compte</h2>
+        <p class="text-sm text-gray-500 mb-4">Cette action est irréversible. Votre compte sera désactivé et vous serez déconnecté.</p>
+        <button type="button" @click="open = true"
+                class="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors">
+            Supprimer mon compte
+        </button>
+
+        <!-- Modal de confirmation -->
+        <div x-show="open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center">
+            <div class="absolute inset-0 bg-black/40" @click="open = false"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full mx-4">
+                <div class="flex items-center justify-center w-12 h-12 bg-red-50 rounded-full mb-4 mx-auto">
+                    <svg class="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-gray-900 text-center mb-2">Confirmer la suppression</h3>
+                <p class="text-sm text-gray-500 text-center mb-6">Êtes-vous sûr de vouloir supprimer votre compte ? Cette action ne peut pas être annulée.</p>
+                <div class="flex gap-3">
+                    <button type="button" @click="open = false"
+                            class="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
+                        Annuler
+                    </button>
+                    <form method="post" action="/profile/delete" class="flex-1">
+                        <button type="submit"
+                                class="w-full px-4 py-2.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors">
+                            Supprimer
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

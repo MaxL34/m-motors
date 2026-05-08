@@ -1,0 +1,100 @@
+{% extends "shared/base.html" %}
+
+{% block title %}M-Motors — Achat et location de véhicules{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<div class="text-center py-16">
+    <h1 class="text-5xl font-extrabold text-gray-900 tracking-tight mb-4">
+        Bienvenue chez <span class="text-blue-600">M-Motors</span>
+    </h1>
+    <p class="text-xl text-gray-500 max-w-2xl mx-auto mb-8">
+        Trouvez le véhicule qui vous correspond — achat ou location, particuliers et professionnels.
+    </p>
+    <div class="flex items-center justify-center gap-4 flex-wrap">
+        <a href="/vehicles"
+           class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-colors">
+            Voir le catalogue
+        </a>
+        <a href="/register"
+           class="border border-gray-300 hover:border-gray-400 text-gray-700 font-semibold px-6 py-3 rounded-xl transition-colors">
+            Créer un compte
+        </a>
+    </div>
+</div>
+
+<!-- Catalogue (aperçu) -->
+{% if vehicles %}
+<div class="mb-4 flex items-center justify-between">
+    <h2 class="text-2xl font-bold text-gray-900">Nos véhicules disponibles</h2>
+    <span class="text-sm text-gray-400">{{ vehicles | length }} véhicule(s)</span>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+    {% for v in vehicles %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+
+        <div class="bg-gray-100 h-44 flex items-center justify-center text-gray-300">
+            <svg class="w-16 h-16" fill="none" stroke="currentColor" stroke-width="1" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/>
+            </svg>
+        </div>
+
+        <div class="p-5 flex flex-col flex-1">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <h3 class="text-base font-semibold text-gray-900 leading-tight">
+                    {{ v.brand }} {{ v.model }}
+                </h3>
+                {% if v.is_for_sale %}
+                <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">Vente</span>
+                {% else %}
+                <span class="shrink-0 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-50 text-purple-700">Location</span>
+                {% endif %}
+            </div>
+
+            <div class="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mb-4">
+                <span>{{ v.year }}</span>
+                {% if v.fuel_type %}<span>· {{ fuel_labels[v.fuel_type] }}</span>{% endif %}
+                {% if v.transmission_type %}<span>· {{ transmission_labels[v.transmission_type] }}</span>{% endif %}
+                <span>· {{ "{:,}".format(v.mileage).replace(",", " ") }} km</span>
+            </div>
+
+            <div class="mt-auto flex items-center justify-between">
+                <span class="text-xl font-bold text-gray-900">
+                    {% if v.is_for_sale and v.selling_price %}
+                        {{ "{:,.0f}".format(v.selling_price).replace(",", " ") }} €
+                    {% elif not v.is_for_sale and v.monthly_rental_price %}
+                        {{ "{:,.0f}".format(v.monthly_rental_price).replace(",", " ") }} €<span class="text-sm font-normal text-gray-500">/mois</span>
+                    {% else %}
+                        <span class="text-base font-medium text-gray-400">Prix sur demande</span>
+                    {% endif %}
+                </span>
+                <a href="/vehicles/{{ v.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800 transition-colors">
+                    Voir →
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% else %}
+<div class="text-center py-16 text-gray-400">
+    <p class="text-lg font-medium">Aucun véhicule disponible pour le moment.</p>
+    <p class="text-sm mt-1">Revenez bientôt.</p>
+</div>
+{% endif %}
+
+<!-- Séparateur espace admin -->
+<div class="border-t border-gray-100 pt-8 mt-4 text-center">
+    <p class="text-sm text-gray-400">
+        Vous êtes administrateur ?
+        <a href="/admin/login" class="text-gray-600 hover:text-gray-900 font-medium underline underline-offset-2 ml-1">
+            Accéder à l'espace admin
+        </a>
+    </p>
+</div>
+
+{% endblock %}

@@ -6,9 +6,15 @@ __pycache__/
 .env
 static/uploads/*
 !static/uploads/.gitkeep
+uploads/
 *.log
 .DS_Store
 .vscode/
 .pytest_cache/
 htmlcov/
+reports/
 .coverage
+test.db
+scripts/
+reports/
+logs/

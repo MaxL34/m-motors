@@ -1,0 +1,214 @@
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import Session
+from fastapi import HTTPException, status
+
+from app.models.client_file import ClientFile, ClientFileStatus, ClientFileType
+from app.models.document import DocumentStatus
+from app.schemas.client_file_schema import ClientFileCreate
+
+TOTAL_DOCUMENT_TYPES = 8
+MAX_ACTIVE_FILES = 3
+
+ACTIVE_STATUSES = [
+    ClientFileStatus.PENDING,
+    ClientFileStatus.IN_PROGRESS,
+    ClientFileStatus.APPROVED,
+]
+
+
+def get_client_file(db: Session, file_id: int) -> ClientFile:
+    file = db.query(ClientFile).filter(ClientFile.id == file_id).first()
+    if not file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable")
+    return file
+
+
+def get_client_file_by_user(db: Session, user_id: int) -> ClientFile | None:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.user_id == user_id)
+        .filter(ClientFile.deleted_at.is_(None))
+        .filter(ClientFile.status.notin_([ClientFileStatus.CANCELLED]))
+        .order_by(ClientFile.created_at.desc())
+        .first()
+    )
+
+
+def get_all_active_client_files_by_user(db: Session, user_id: int) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.user_id == user_id)
+        .filter(ClientFile.deleted_at.is_(None))
+        .filter(ClientFile.status.notin_([ClientFileStatus.CANCELLED]))
+        .order_by(ClientFile.created_at.desc())
+        .all()
+    )
+
+
+def _count_active_files(db: Session, user_id: int) -> int:
+    return db.query(ClientFile).filter(
+        ClientFile.user_id == user_id,
+        ClientFile.deleted_at.is_(None),
+        ClientFile.status.in_(ACTIVE_STATUSES),
+    ).count()
+
+
+def get_or_create_client_file(db: Session, user_id: int, data: ClientFileCreate) -> ClientFile:
+    existing = db.query(ClientFile).filter(
+        ClientFile.user_id == user_id,
+        ClientFile.vehicle_id == data.vehicle_id,
+        ClientFile.deleted_at.is_(None),
+    ).first()
+    if existing:
+        if existing.status in (ClientFileStatus.CANCELLED, ClientFileStatus.REJECTED):
+            if _count_active_files(db, user_id) >= MAX_ACTIVE_FILES:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Vous ne pouvez pas avoir plus de {MAX_ACTIVE_FILES} dossiers actifs simultanément.",
+                )
+            existing.status = ClientFileStatus.PENDING
+            existing.file_type = data.file_type
+            db.commit()
+            db.refresh(existing)
+        return existing
+
+    if _count_active_files(db, user_id) >= MAX_ACTIVE_FILES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Vous ne pouvez pas avoir plus de {MAX_ACTIVE_FILES} dossiers actifs simultanément.",
+        )
+    client_file = ClientFile(
+        user_id=user_id,
+        vehicle_id=data.vehicle_id,
+        file_type=data.file_type,
+        status=ClientFileStatus.PENDING,
+    )
+    db.add(client_file)
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
+def get_all_client_files(
+    db: Session,
+    file_type: ClientFileType | None = None,
+    status: ClientFileStatus | None = None,
+    sort_by: str = "created_at",
+    sort_order: str = "desc",
+) -> list[ClientFile]:
+    query = db.query(ClientFile).filter(ClientFile.deleted_at.is_(None))
+    if file_type:
+        query = query.filter(ClientFile.file_type == file_type)
+    if status:
+        query = query.filter(ClientFile.status == status)
+    col = ClientFile.created_at
+    query = query.order_by(col.asc() if sort_order == "asc" else col.desc())
+    return query.all()
+
+
+def soft_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
+    client_file = get_client_file(db, file_id)
+    client_file.deleted_at = datetime.now(timezone.utc)
+    client_file.deleted_by_admin_id = admin_id
+    client_file.deleted_reason = reason
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
+def get_closed_client_files_by_user(db: Session, user_id: int) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(
+            ClientFile.user_id == user_id,
+            ClientFile.deleted_at.is_not(None),
+            ClientFile.permanently_deleted_at.is_(None),
+        )
+        .order_by(ClientFile.deleted_at.desc())
+        .all()
+    )
+
+
+def get_trashed_client_files(db: Session) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
+        .order_by(ClientFile.deleted_at.desc())
+        .all()
+    )
+
+
+def get_deletion_history(db: Session) -> list[ClientFile]:
+    return (
+        db.query(ClientFile)
+        .filter(ClientFile.permanently_deleted_at.is_not(None))
+        .order_by(ClientFile.permanently_deleted_at.desc())
+        .all()
+    )
+
+
+def restore_client_file(db: Session, file_id: int) -> ClientFile:
+    client_file = (
+        db.query(ClientFile)
+        .filter(ClientFile.id == file_id, ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
+        .first()
+    )
+    if not client_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable dans la corbeille")
+    client_file.deleted_at = None
+    client_file.deleted_by_admin_id = None
+    client_file.deleted_reason = None
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
+def permanent_delete_client_file(db: Session, file_id: int, admin_id: int, reason: str) -> ClientFile:
+    client_file = (
+        db.query(ClientFile)
+        .filter(ClientFile.id == file_id, ClientFile.deleted_at.is_not(None), ClientFile.permanently_deleted_at.is_(None))
+        .first()
+    )
+    if not client_file:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dossier introuvable dans la corbeille")
+    client_file.permanently_deleted_at = datetime.now(timezone.utc)
+    client_file.permanently_deleted_by_admin_id = admin_id
+    client_file.permanently_deleted_reason = reason
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
+def update_status(
+    db: Session,
+    file_id: int,
+    new_status: ClientFileStatus,
+    cancellation_reason: str | None = None,
+    rejection_reason: str | None = None,
+) -> ClientFile:
+    client_file = get_client_file(db, file_id)
+    if new_status == ClientFileStatus.APPROVED:
+        db.refresh(client_file)
+        validated_count = sum(
+            1 for d in client_file.documents if d.status == DocumentStatus.VALIDATED
+        )
+        if validated_count < TOTAL_DOCUMENT_TYPES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tous les documents doivent être validés avant d'approuver le dossier ({validated_count}/{TOTAL_DOCUMENT_TYPES} validés).",
+            )
+    client_file.status = new_status
+    client_file.cancellation_reason = cancellation_reason or None if new_status == ClientFileStatus.CANCELLED else None
+    client_file.rejection_reason = rejection_reason or None if new_status == ClientFileStatus.REJECTED else None
+    db.commit()
+    db.refresh(client_file)
+    return client_file
+
+
+def compute_progress(client_file: ClientFile) -> int:
+    """Retourne le pourcentage d'avancement basé sur les documents validés."""
+    if not client_file.documents:
+        return 0
+    validated = sum(1 for d in client_file.documents if d.status == DocumentStatus.VALIDATED)
+    return int((validated / TOTAL_DOCUMENT_TYPES) * 100)

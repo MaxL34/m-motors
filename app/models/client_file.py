@@ -1,0 +1,56 @@
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+
+from sqlalchemy import DateTime, Enum as SqlEnum, Float, ForeignKey, Integer, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
+
+from app.database import Base
+
+
+class ClientFileStatus(str, Enum):
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    CANCELLED = "CANCELLED"
+    COMPLETED = "COMPLETED"
+
+
+class ClientFileType(str, Enum):
+    SALE = "SALE"
+    RENTAL = "RENTAL"
+
+
+class ClientFile(Base):
+    __tablename__ = "client_files"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    vehicle_id: Mapped[int] = mapped_column(ForeignKey("vehicles.id"), nullable=False)
+
+    agreed_price: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    file_type: Mapped[ClientFileType] = mapped_column(SqlEnum(ClientFileType), nullable=False)
+
+    status: Mapped[ClientFileStatus] = mapped_column(
+        SqlEnum(ClientFileStatus), default=ClientFileStatus.PENDING, nullable=False
+    )
+    cancellation_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by_admin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    deleted_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    permanently_deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    permanently_deleted_by_admin_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    permanently_deleted_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    user: Mapped["User"] = relationship("User", back_populates="client_files", foreign_keys=[user_id])
+    vehicle: Mapped["Vehicle"] = relationship("Vehicle", back_populates="client_files")
+    documents: Mapped[list["Document"]] = relationship("Document", back_populates="client_file")
