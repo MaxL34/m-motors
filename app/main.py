@@ -1,6 +1,8 @@
 import sentry_sdk
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.orm import Session
+from app.database import get_db
 from loguru import logger
 
 from app.config import settings
