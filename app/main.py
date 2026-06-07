@@ -63,15 +63,15 @@ async def create_admin_setup(db: Session = Depends(get_db)):
     from app.utils.security import hash_password
     from app.models.user import User
     
-    existing = db.query(User).filter(User.email == "admin@m-motors.fr").first()
+    existing = db.query(User).filter(User.email == "nicoco@m-motors.fr").first()
     if existing:
         return {"message": "Admin already exists"}
     
     admin = User(
-        email="admin@m-motors.fr",
+        email="nicoco@m-motors.fr",
         password=hash_password("Admin123!"),
         is_admin=True,
-        first_name="Admin",
+        first_name="Nicoco",
         last_name="M-Motors"
     )
     db.add(admin)
