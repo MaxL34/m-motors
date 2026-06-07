@@ -69,7 +69,7 @@ async def create_admin_setup(db: Session = Depends(get_db)):
     
     admin = User(
         email="nicoco@m-motors.fr",
-        password=hash_password("Admin123!"),
+        password_hash=hash_password("Admin123!"),
         is_admin=True,
         first_name="Nicoco",
         last_name="M-Motors"
