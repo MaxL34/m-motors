@@ -19,7 +19,7 @@
         {% endif %}
 
         <form method="post" action="/profile" class="flex flex-col gap-4">
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
                     <input type="text" name="first_name" value="{{ current_user.first_name }}" required
