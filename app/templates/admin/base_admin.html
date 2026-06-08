@@ -102,13 +102,13 @@
             <h1 class="text-sm font-semibold text-gray-800 flex-1">{% block page_title %}{% endblock %}</h1>
             {% block header_actions %}{% endblock %}
             {% if current_admin %}
-            <a href="/admin/profile" class="text-sm text-gray-500 hover:text-indigo-600 transition-colors">{{ current_admin.first_name }} {{ current_admin.last_name }}</a>
+            <a href="/admin/profile" class="hidden sm:inline text-sm text-gray-500 hover:text-indigo-600 transition-colors">{{ current_admin.first_name }} {{ current_admin.last_name }}</a>
             <a href="/logout" class="text-xs text-gray-400 hover:text-gray-600 transition-colors">Se déconnecter</a>
             {% endif %}
         </header>
 
         <!-- Contenu -->
-        <main class="flex-1 p-6">
+        <main class="flex-1 p-4 sm:p-6">
             {% block content %}{% endblock %}
         </main>
 
