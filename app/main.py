@@ -14,7 +14,7 @@ from app.routers import vehicles, admin, pages, auth, profile, client_files, fav
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 
-setup_logging()
+setup_logging(environment=settings.ENVIRONMENT)
 
 # ── Sentry ────────────────────────────────────────────────────────────────────
 
