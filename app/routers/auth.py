@@ -238,7 +238,7 @@ async def login(
             status_code=403,
         )
     if not user:
-        logger.warning(f"LOGIN échoué | email={email} | identifiants invalides")
+        logger.bind(category="LOGIN").warning(f"échoué | email={email} | identifiants invalides")
         return templates.TemplateResponse(
             name="auth/login.html",
             request=request,
@@ -253,7 +253,7 @@ async def login(
             status_code=403,
         )
 
-    logger.info(f"LOGIN user | {user.email} (id={user.id})")
+    logger.bind(category="LOGIN").info(f"user | {user.email} (id={user.id})")
     token = create_access_token({"sub": str(user.id), "is_admin": False})
     response = RedirectResponse("/vehicles", status_code=303)
     response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
@@ -304,7 +304,7 @@ async def post_unlock(
 
     unlock_user(db, user)
 
-    logger.info(f"LOGIN user (déverrouillage OTP) | {user.email} (id={user.id})")
+    logger.bind(category="LOGIN").info(f"user (déverrouillage OTP) | {user.email} (id={user.id})")
     token = create_access_token({"sub": str(user.id), "is_admin": False})
     response = RedirectResponse("/", status_code=303)
     response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
@@ -324,14 +324,14 @@ async def admin_login(
     """Authenticate an admin user. Rejects non-admin credentials."""
     user, error = authenticate_user(db, email, password)
     if not user or not user.is_admin:
-        logger.warning(f"LOGIN admin échoué | email={email}")
+        logger.bind(category="LOGIN").warning(f"admin échoué | email={email}")
         return templates.TemplateResponse(
             name="auth/admin_login.html",
             request=request,
             context={"error": "Identifiants invalides ou accès non autorisé.", "form_email": email},
             status_code=401,
         )
-    logger.info(f"LOGIN admin | {user.email} (id={user.id})")
+    logger.bind(category="LOGIN").info(f"admin | {user.email} (id={user.id})")
     token = create_access_token({"sub": str(user.id), "is_admin": True})
     response = RedirectResponse("/admin/vehicles", status_code=303)
     response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax")
@@ -515,8 +515,14 @@ async def post_reset_password(
 # ── Logout ────────────────────────────────────────────────────────────────────
 
 @router.get("/logout")
-def logout():
+def logout(request: Request):
     """Clear the session cookie and redirect to the homepage."""
+    from app.utils.security import decode_access_token
+    token = request.cookies.get(COOKIE_NAME)
+    if token:
+        payload = decode_access_token(token)
+        if payload:
+            logger.bind(category="DISCONNECT").info(f"id={payload.get('sub')}")
     response = RedirectResponse("/", status_code=303)
     response.delete_cookie(COOKIE_NAME)
     return response

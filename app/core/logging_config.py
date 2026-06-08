@@ -10,7 +10,11 @@ def setup_logging(environment: str = "development") -> None:
     logger.add(
         sys.stdout,
         level="DEBUG" if is_production else "INFO",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name} - {message}",
+        format=lambda r: "{cat:<12} | {name} - {message}\n".format(
+            cat=r["extra"].get("category", r["level"].name),
+            name=r["name"],
+            message=r["message"],
+        ),
         colorize=not is_production,
         backtrace=is_production,
         diagnose=is_production,
