@@ -20,6 +20,7 @@
 
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-10"
      x-data="{ deleteFileId: null, deleteFileName: '', deletionReason: '', restoreFileId: null, restoreFileName: '' }">
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -73,6 +74,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 
     <!-- Modal confirmation restauration -->
     <div x-show="restoreFileId !== null" x-cloak
@@ -162,6 +164,7 @@
 
     {% if deletion_history %}
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead class="bg-gray-50 border-b border-gray-100">
                 <tr>
@@ -195,6 +198,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
     </div>
     {% else %}
     <div class="flex items-center justify-center py-8 text-gray-400 bg-white rounded-2xl border border-gray-100">
