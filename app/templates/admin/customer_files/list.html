@@ -84,6 +84,7 @@
 {% if files_with_progress %}
 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
      x-data="{ deleteFileId: null, deleteFileName: '', deletionReason: '' }">
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-100">
             <tr>
@@ -146,6 +147,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 
     <!-- Modal confirmation suppression -->
     <div x-show="deleteFileId !== null" x-cloak
