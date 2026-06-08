@@ -2,35 +2,37 @@ import sys
 from loguru import logger
 
 
-def setup_logging() -> None:
+def setup_logging(environment: str = "development") -> None:
     logger.remove()
 
-    # Console : niveau INFO, format lisible
+    is_production = environment != "development"
+
     logger.add(
         sys.stdout,
-        level="INFO",
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level:<8}</level> | <cyan>{name}</cyan> - <level>{message}</level>",
-        colorize=True,
+        level="DEBUG" if is_production else "INFO",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name} - {message}",
+        colorize=not is_production,
+        backtrace=is_production,
+        diagnose=is_production,
     )
 
-    # Fichier applicatif : tous les niveaux, rotation 10 Mo, 30 jours de rétention
-    logger.add(
-        "logs/app.log",
-        level="DEBUG",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{line} - {message}",
-        rotation="10 MB",
-        retention="30 days",
-        encoding="utf-8",
-    )
+    if not is_production:
+        logger.add(
+            "logs/app.log",
+            level="DEBUG",
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{line} - {message}",
+            rotation="10 MB",
+            retention="30 days",
+            encoding="utf-8",
+        )
 
-    # Fichier dédié aux erreurs uniquement
-    logger.add(
-        "logs/errors.log",
-        level="ERROR",
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{line} - {message}\n{exception}",
-        rotation="10 MB",
-        retention="60 days",
-        encoding="utf-8",
-        backtrace=True,
-        diagnose=True,
-    )
+        logger.add(
+            "logs/errors.log",
+            level="ERROR",
+            format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {name}:{line} - {message}\n{exception}",
+            rotation="10 MB",
+            retention="60 days",
+            encoding="utf-8",
+            backtrace=True,
+            diagnose=True,
+        )
