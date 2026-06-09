@@ -20,6 +20,7 @@
                 <a href="/vehicles" class="text-gray-600 hover:text-gray-900 transition-colors">Catalogue</a>
                 {% if current_user %}
                 <a href="/my-file" class="text-gray-600 hover:text-gray-900 transition-colors">Mon dossier</a>
+                <a href="/favorites" class="text-gray-600 hover:text-gray-900 transition-colors">Mes favoris</a>
                 <a href="/profile" class="text-gray-600 hover:text-gray-900 transition-colors">{{ current_user.first_name }}</a>
                 <a href="/logout" class="text-gray-600 hover:text-gray-900 transition-colors">Se déconnecter</a>
                 {% else %}
@@ -45,6 +46,7 @@
             <a href="/vehicles" class="text-gray-600 hover:text-gray-900 transition-colors py-1">Catalogue</a>
             {% if current_user %}
             <a href="/my-file" class="text-gray-600 hover:text-gray-900 transition-colors py-1">Mon dossier</a>
+            <a href="/favorites" class="text-gray-600 hover:text-gray-900 transition-colors py-1">Mes favoris</a>
             <a href="/profile" class="text-gray-600 hover:text-gray-900 transition-colors py-1">{{ current_user.first_name }}</a>
             <a href="/logout" class="text-gray-600 hover:text-gray-900 transition-colors py-1">Se déconnecter</a>
             {% else %}
